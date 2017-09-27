@@ -1,0 +1,85 @@
+#!/usr/bin/env python
+
+__usage__ = "plot_psd [--options] psd.txt.gz psd.txt.gz ..."
+__description__ = "plot PSDs stored in gzipped ascii files like those produced by compute_psd"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import os
+
+import numpy as np
+
+import matplotlib
+matplotlib.use("Agg")
+from matplotlib import pyplot as plt
+plt.rcParams['text.usetex'] = True
+
+from optparse import OptionParser
+
+#-------------------------------------------------
+
+parser = OptionParser(usage=__usage__, description=__description__)
+
+parser.add_option('-v', '--verbose', default=False, action='store_true')
+
+parser.add_option('', '--f-min', default=8, type='float', 
+    help='DEFAULT=8')
+parser.add_option('', '--f-max', default=2048, type='float',
+    help='DEFAULT=2048')
+
+parser.add_option('', '--y-min', default=1e-24, type='float',
+    help='DEFAULT=1e-24')
+parser.add_option('', '--y-max', default=1e-20, type='float',
+    help='DEFAULT=1e-20')
+
+parser.add_option('', '--legend', default=False, action='store_true')
+
+parser.add_option('-o', '--output-dir', default='.', type='string')
+parser.add_option('-t', '--tag', default='', type='string')
+
+parser.add_option('', '--figtype', default=[], type='string', action='append')
+
+opts, args = parser.parse_args()
+
+assert len(args), 'please supply at least one input argument\n%s'%__usage__
+
+if opts.tag:
+    opts.tag = "_"+opts.tag
+
+if not opts.figtype:
+    opts.figtype.append( 'png' )
+
+#-------------------------------------------------
+
+fig = plt.figure()
+ax = fig.gca()
+
+### iterate and plot
+for path in args:
+    if opts.verbose:
+        print( path )
+
+    freq, psd = np.loadtxt(path).transpose() ### read in
+    
+    ax.loglog(freq, psd**0.5, label=os.path.basename(path).strip('.txt.gz'))
+
+### decorate
+ax.set_xlabel('$f$ [Hz]')
+ax.set_ylabel('ASD [1/$\sqrt{\mathrm{Hz}}$]')
+
+ax.grid(True, which='both')
+
+if opts.legend:
+    ax.legend(loc='best')
+
+ax.set_xlim(xmin=opts.f_min, xmax=opts.f_max)
+ax.set_ylim(ymin=opts.y_min, ymax=opts.y_max)
+
+### save
+for figtype in opts.figtype:
+    figname = "%s/psd%s.%s"%(opts.output_dir, opts.tag, figtype)
+    if opts.verbose:
+        print( figname )
+    fig.savefig(figname)
+plt.close(fig)
