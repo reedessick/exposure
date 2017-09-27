@@ -181,7 +181,7 @@ def __resample_lowpass(vec, dt, new_dt):
 #=================================================
 # PSD utilities
 #=================================================
-def estimate_psd(vec, num_segs=1, overlap=0, dt=1.0):
+def estimate_psd(vec, num_segs=1, overlap=0, dt=1.0, tukey_alpha=0.1):
         """
         estimates the PSD using a DFT
         divides vec into "num_segs" with "overlap" shared entries between neighbors
@@ -204,7 +204,7 @@ def estimate_psd(vec, num_segs=1, overlap=0, dt=1.0):
         psds = np.empty((n/2, num_segs), complex)
         for segNo in xrange(num_segs):
                 start = segNo*(n-overlap)
-                psds[:,segNo], freqs = dft(vec[start:start+n], dt=dt)
+                psds[:,segNo], freqs = dft(vec[start:start+n]*tukey(n, tukey_alpha), dt=dt)
 
         ### average
         mean_psd = np.sum(psds.real**2 + psds.imag**2, axis=1) / (seglen*num_segs)

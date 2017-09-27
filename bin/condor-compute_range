@@ -1,0 +1,43 @@
+#!/usr/bin/env python
+
+__usage__ = 'condor-compute_range [--options] psd.txt.gz psd.txt.gz ...'
+__desription__ = "massive parallelizatoin of compute_range"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+from optparse import OptionParser
+
+#-------------------------------------------------
+
+parser = OptionParser(usage=__usage__, description=__description__)
+
+parser.add_option("-v", "--verbose", default=False, action="store_true")
+
+parser.add_option('', '--universe', default='vanilla', type='string',
+    help='DEFAULT=vanilla')
+parser.add_option('', '--exe', default='compute_range', type='string',
+    help='specify the explicit path to the executable. \
+DEFAULT=compute_range')
+
+parser.add_option('', '--accounting-group', default='ligo.dev.o1.burst.explore.test', type='string',
+    help='DEFAULT=ligo.dev.o1.burst.explore.test')
+parser.add_option('', '--accounting-group-user', default=getpass.getuser(), type='string',
+    help='DEFAULT='+getpass.getuser())
+
+parser.add_option('', '--retry', default=0, type='int',
+    help='DEFAULT=0')
+
+parser.add_option("-o", "--output-dir", default='.', type='string')
+parser.add_option("-t", "--tag", default="", type='string')
+
+opts, args = parser.parse_args()
+
+if opts.tag:
+    opts.tag = "_"+opts.tag
+
+#-------------------------------------------------
+
+raise NotImplementedError, '''\
+basically just iterate over arguments and create one job for each
+'''

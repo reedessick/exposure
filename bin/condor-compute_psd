@@ -1,0 +1,175 @@
+#!/usr/bin/env python
+
+__usage__ = "condor-compute_psd [--options] channel frametype gpsstart gpsstop"
+__description__ = "a very basic wrapper that schedules `compute_psd` jobs. The resulting DAG should run to completion if everything worked correctly (i.e. nodes should not raise exceptions"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import utils
+
+import getpass ### for default accounting_group_user
+
+from optparse import OptionParser
+
+#-------------------------------------------------
+
+parser = OptionParser(usage=__usage__, description=__description__)
+
+parser.add_option("-v", "--verbose", default=False, action="store_true")
+
+parser.add_option("", "--include-flag", default=[], type='string', action='append',
+    help='the flags used to select subsets of [gpsstart, gpsstop] for analysis. \
+Can be repeated to take the intersection of multiple flags. \
+DEFAULT=[] (analyze all time in [gpsstart, gpsstop]).')
+parser.add_option("", "--exclude-flag", default=[], type='string', action='append',
+    help='the same as --include-flag, except we only retain times that are \
+outside of these flags instead of inside them')
+
+parser.add_option("", "--win", default=60, type="int",
+    help="estimate PSDs separately in sequential windows of this duration. \
+DEFAULT=60")
+
+parser.add_option("", "--seglen", default=4, type='int',
+    help='the length of segments used to estimate the PSD via an averaging procedure (specify in seconds). \
+NOTE: if we do not obtain an integer number of segments based on --seglen, --overlap, gpsstart, and gpsstop, \
+we will raise a ValueError. DEFAULT=4')
+parser.add_option("", "--overlap", default=2, type='float',
+    help='the amount of time overlapped for segments used to estimate the PSD (specify in seconds). \
+NOTE: if we do not obtain an integer number of segments based on --seglen, --overlap, gpsstart, and gpsstop, \
+we will raise a ValueError. DEFAULT=2')
+parser.add_option("", "--tukey-alpha", default=0.50, type='float',
+    help='the Tukey "alpha" value used for windowing the DFT. \
+DEFAULT=0.50')
+
+parser.add_option('', '--universe', default='vanilla', type='string',
+    help='DEFAULT=vanilla')
+parser.add_option('', '--exe', default='compute_psd', type='string',
+    help='specify the explicit path to the executable. \
+DEFAULT=compute_psd')
+
+parser.add_option('', '--accounting-group', default='ligo.dev.o1.burst.explore.test', type='string',
+    help='DEFAULT=ligo.dev.o1.burst.explore.test')
+parser.add_option('', '--accounting-group-user', default=getpass.getuser(), type='string',
+    help='DEFAULT='+getpass.getuser())
+
+parser.add_option('', '--retry', default=0, type='int', 
+    help='DEFAULT=0')
+
+parser.add_option("-o", "--output-dir", default='.', type='string')
+parser.add_option("-t", "--tag", default="", type='string')
+
+opts, args = parser.parse_args()
+assert len(args)==4, 'please supply exactly 4 arguments\n%s'%__usage__
+channel, frametype = args[:2]
+gpsstart, gpsstop = [int(_) for _ in args[2:]]
+
+if opts.tag:
+    opts.tag = "_"+opts.tag
+
+assert channel[0]==frametype[0], 'I do not believe you want a channel and frametype \
+from different IFOs\n\tchannel : %s\n\tframetype : %s\n%s'%(channel, frametype, __usage__)
+
+assert opts.seglen > opts.overlap, '--seglen must be larger than --overlap\n\%s'%__usage__
+
+optDict = {
+    'gpsstart' : gpsstart,
+    'gpsstop'  : gpsstop,
+    'observatory' : channel[0],
+    'frametype' : frametype,
+}
+
+#-------------------------------------------------
+
+### query segments to define individual runs
+### ensure we have proper coverage
+query_cmd = "ligolw_segment_query_dqsegdb -q -t https://segments.ligo.org -a %(flag)s -s %(gpsstart)d -e %(gpsstop)d"
+print_cmd = "ligolw_print -c start_time -c end_time -t segment".split()
+
+segments = [[gpsstart, gpsstop]]
+
+for flag in opts.include_flag:
+    optDict['flag'] = flag
+    cmd = query_cmd%optDict
+    if opts.verbose:
+        print( cmd )
+    segs = sp.Popen(cmd.split(), stdout=sp.PIPE).communicate()[0]
+    segs = [[int(_) for _ in seg.split(',')] for seg in sp.Popen(print_cmd, stdin=sp.PIPE, stdout=sp.PIPE).communicate(segs)[0].strip('\n').split('\n')]
+
+    segments = utils.andsegments(segments, segs)
+
+for flag in opts.exclude_flag:
+    optDict['flag'] = flag
+    cmd = query_cmd%optDict
+    if opts.verbose:
+        print( cmd )
+    segs = sp.Popen(cmd.split(), stdout=sp.PIPE).communicate()[0]
+    segs = [[int(_) for _ in seg.split(',')] for seg in sp.Popen(print_cmd, stdin=sp.PIPE, stdout=sp.PIPE).communicate(segs)[0].strip('\n').split('\n')]
+
+    segments = utils.andsegments(segments, utils.invsegments(gpsstart, gpsstop, segs))
+
+### check to make sure we have livetime left, etc
+assert len(segments), 'no remaining livetime after filtering by flags!'
+
+#------------------------
+
+### write sub file
+subname = "%s/compute_psd%s.sub"%(opts.output_dir, opts.tag)
+if opts.verbose:
+    print( "writing : "+subname )
+f = open(subname, 'w')
+f.write('''universe = %(universe)s
+executable = %(exe)s
+arguments = "%(channel)s %(frametype)s $(gpsstart) $(gpsstop) $(seglen) $(overlap) $(tukey_alpha)"
+getenv = true
+accounting_group = %(accounting_group)s
+accounting_group_user = %(accounting_group_user)s
+log    = %(outdir)s/condor-compute_psd%(tag)s-%(start)d-%(dur)d_$(Cluster)-$(Process).log
+error  = %(outdir)s/condor-compute_psd%(tag)s-%(start)d-%(dur)d_$(Cluster)-$(Process).err 
+output = %(outdir)s/condor-compute_psd%(tag)s-%(start)d-%(dur)d_$(Cluster)-$(Process).out
+notification = never
+queue 1'''%{\
+    'universe' : opts.universe,
+    'exe' : opts.exe,
+    'channel' : channel,
+    'frametype' : frametype,
+    'accounting_group' : opts.accounting_group,
+    'accounting_group_user' : opts.accounting_group_user,
+    'outdir' : opts.output_dir,
+    'tag' : opts.tag,
+    'start' : gpsstart,
+    'dur' : gpsstop-gpsstart,
+})
+f.close()
+
+### iterate over segments and define compute_psd jobs for each
+dagname = subname.replace('.sub', '.dag')
+if opts.verbose:
+    print( "writing : "+dagname )
+f = open(dagname, 'w')
+
+template = '''\
+JOB   %(gpsstart)d %(sub)s
+VARS  %(gpsstart)d gpsstart="%(gpsstart)d" gpsstop="%(gpsstop)d" seglen="%(seglen)d" overlap="%(overlap)d" tukey_alpha="%(tukey_alpha)f"
+RETRY %(gpsstart)d %(retry)d
+'''
+for segstart, segstop in segments:
+    segdur = segstop - segstart
+    n = segdur/opts.win ### the largest number of segments I can fit here -> integer division
+    if opts.verbose:
+        print( "scheduling %d jobs for %d -- %d"%(segstart, segstop) )
+    
+    s = segstart + (segdur%opts.win)/2 ### add a buffer to try to center the PSDs within the segment
+    while s < segstop:
+        f.write(template%{\
+            'gpsstart' : s, 
+            'gpsstop' : s+opts.win,
+            'seglen' : opts.seglen,
+            'overlap' : opts.overlap,
+            'tukey_alpha' : opts.tukey_alpha,
+            'sub' : subname, 
+            'retry' : opts.retry,
+        })
+        s += opts.win
+
+f.close()

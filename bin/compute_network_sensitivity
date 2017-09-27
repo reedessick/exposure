@@ -1,0 +1,42 @@
+#!/usr/bin/env python
+
+__usage__ = "compute_network_sensitivity [--options] gps gps gps ..."
+__description__ = "compute the network sensitivity given ifo, range pairs"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import healpy as hp
+
+import detector_cache
+
+from optparse import OptionParser
+
+#-------------------------------------------------
+
+parser = OptionParser(usage=__usage__, description=__description__)
+
+parser.add_option('-v', '--verbose', default=False, action='store_true')
+
+parser.add_option('', '--ifo-range', nargs=2, default=[], type='string', action='append',
+    help='specify which IFOs to include and paths to their range files as, e.g.: H1 path/to/range.txt.gz \
+DEFAULT=[]')
+
+parser.add_option('', '--nside', default=512, type='int', 
+    help='the NSIDE resolution for the resulting FITS files')
+
+parser.add_option('-o', '--output-dir', default='.', type='string')
+parser.add_option('-t', '--tag', default='', type='string')
+
+opts, args = parser.parse_args()
+
+if opts.tag:
+    opts.tag = "_"+opts.tag
+
+#-------------------------------------------------
+
+raise NotImplementedError, '''\
+read in PSDs and create associated detector objects
+compute the weighted antenna patterns to determine network sensitivity in Geographic coordinates and write this out to a FITS file.
+compute the "pull back" of pixelization defined in Celestial coordinates to Geographic coordinates for each gps, compute sensitivies explicitly at those positions, and write this out to a FITS file. This should be more accurate than simply rotating the Geographic map repeatedly.
+'''
