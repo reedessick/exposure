@@ -1,0 +1,99 @@
+#!/usr/bin/env python
+
+__usage__ = "compute_psd [--options] channel frametype gpsstart gpsstop"
+__description__ = "a very basic executable that computes a PSD estimate based on the time between [gpsstart, gpsstop]. NOTE: if the derived set of segments is not contiguous throughout [gpsstart, gpsstop], we raise an exception."
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import utils
+import dft
+
+import subprocess as sp
+
+from optparse import OptionParser
+
+#-------------------------------------------------
+
+parser = OptionParser(usage=__usage__, description=__description__)
+
+parser.add_option("-v", "--verbose", default=False, action="store_true")
+parser.add_option("-V", "--Verbose", default=False, action="store_true")
+
+parser.add_option("", "--include-flag", default=[], type='string', action='append',
+    help='the flags used to select subsets of [gpsstart, gpsstop] for analysis. \
+Can be repeated to take the intersection of multiple flags. \
+DEFAULT=[] (analyze all time in [gpsstart, gpsstop]).')
+parser.add_option("", "--exclude-flag", defualt=[], type='string', action='append',
+    help='the same as --include-flag, except we only retain times that are \
+outside of these flags instead of inside them')
+
+parser.add_option("", "--seglen", default=4, type='int',
+    help='the length of segments used to estimate the PSD via an averaging procedure (specify in seconds).\
+DEFAULT=4')
+parser.add_option("", "--overlap", default=0, type='float',
+    help='the amount of time overlapped for segments used to estimate the PSD (specify in seconds).\
+DEFAULT=0')
+parser.add_option("", "--tukey-alpha", default=0.1, type='float',
+    help='the Tukey "alpha" value used for windowing the DFT')
+
+parser.add_option("-o", "--output-dir", default='.', type='string')
+parser.add_option("-t", "--tag", defualt="", type='string')
+
+opts, args = parser.parse_args()
+assert len(args)==4, 'please supply exactly 4 arguments\n%s'%__usage__
+channel, frametype = args[:2]
+gpsstart, gpsstop = [int(_) for _ in args[2:]]
+
+if opts.tag:
+    opts.tag = "_"+opts.tag
+
+assert channel[0]==frametype[0], 'I do not believe you want a channel and frametype \
+from different IFOs\n\tchannel : %s\n\tframetype : %s'%(channel, frametype)
+
+optDict = {
+    'gpsstart' : gpsstart,
+    'gpsstop'  : gpsstop,
+    'observatory' : channel[0],
+    'frametype' : frametype,
+}
+
+opts.verbose |= opts.Verbose
+
+#-------------------------------------------------
+
+### grab segments
+segments = [[gpsstart, gpsstop]]
+for flag in opts.flag:
+    optDict['flag'] = flag
+    cmd = "ligolw_segment_query_dqsegdb -q -t https://segments.ligo.org -a %{flag} -s %{gpsstart} -e %{gpsstop}"
+    if opts.verbose:
+        print( cmd )
+    segs = sp.Popen(cmd.split(), stdout=sp.PIPE).communicate()[0]
+    cmd = "ligolw_print -c start_time -c end_time"
+    segs = [[float(_) for _ in seg.split(',')] for seg in sp.Popen(cmd.split(), stdin=sp.PIPE, stdout=sp.PIPE).communicate(segs)[0].split('\n')]
+    
+    raise NotImplementedError, "take intersection with current segments"
+
+raise NotImplementedError, 'ensure there is non-zero livetime associated with segments, that the data has no gaps, etc.'
+
+#------------------------
+
+### grab frames
+cmd = "gw_data_find -o %{observatory}s --type %{frametype}s --url file -s %{gpsstart}d -e %{gpsstop}d"%optDict
+if opts.verbose:
+    print( cmd )
+frames = sp.Popen(cmd.split(), stdout=sp.PIPE).communicate()[0].replace('file://localhost','').split('\n')
+raise NotImplementedError, "ensure frames cover all the segments we want, are non-overlapping, and are contiguous"
+
+#-------------------------------------------------
+
+### read in data, compute PSD
+for s, e in segments:
+    raise NotImplementedError, 'need to figure out num_segs for this segment based on command-line options'
+    vect, dt = utils.vec_from_frames(frames, s, e, verbose=opts.Verbose)
+    raise NotImplementedError, 'apply Tukey window to vector'
+    dft.estimate_psd(vec, num_segs=opts.num_segs, overlap=opts.overlap, dt=dt)
+
+### write PSD
+raise NotImplementedError
