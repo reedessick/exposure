@@ -3,13 +3,13 @@
 This is a simple library that's meant to compute the exposure of a network of GW detectors. In particular, this is decomposed into 
 
   - estimating the PSD within (join) lock segments as a function of time via massive parallelization
-    - compute_psd (parallelized via condor-compute_psd)
+    - `compute_psd` (parallelized via `condor-compute_psd`)
 
   - estimation of range for a particular detector given a particular PSD
-    - compute_range (parallelized via condor-compute_range)
+    - `compute_range` (parallelized via `condor-compute_range`)
 
   - estimation of network sensitivies given a set of detectors and their associated ranges
-    - compute_network_sensitivity (parallelized via condor-compute_network_sensitivity)
+    - `compute_network_sensitivity` (parallelized via `condor-compute_network_sensitivity`)
 
   - estimation of overall exposure by integrating network sensitivities over time
     - `compute_exposure`
