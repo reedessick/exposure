@@ -47,6 +47,9 @@ assert len(args), 'please supply at least one input argument\n%s'%__usage__
 if opts.tag:
     opts.tag = "_"+opts.tag
 
+if not os.path.exists(opts.output_dir):
+    os.makedirs(opts.output_dir)
+
 if not opts.figtype:
     opts.figtype.append( 'png' )
 

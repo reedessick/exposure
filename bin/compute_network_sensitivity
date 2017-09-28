@@ -6,6 +6,8 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 
 #-------------------------------------------------
 
+import os
+
 import numpy as np
 import healpy as hp
 
@@ -33,13 +35,16 @@ parser.add_option('-t', '--tag', default='', type='string')
 
 opts, args = parser.parse_args()
 
+for ifo, _ in opts.ifo_horizon:
+    assert detector_cache.detectors.has_key(ifo), 'IFO=%s not understood'%ifo
+
 args = [float(_) for _ in args] ### convert gps times to floats
 
 if opts.tag:
     opts.tag = "_"+opts.tag
 
-for ifo, _ in opts.ifo_horizon:
-    assert detector_cache.detectors.has_key(ifo), 'IFO=%s not understood'%ifo
+if not os.path.exists(opts.output_dir):
+    os.makedirs(opts.output_dir)
 
 opts.verbose |= opts.Verbose
 

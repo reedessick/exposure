@@ -58,6 +58,9 @@ if opts.tag:
 if not opts.figtype:
     opts.figtype.append( 'png' )
 
+if not os.path.exists(opts.output_dir):
+    os.makedirs(opts.output_dir)
+
 #-------------------------------------------------
 
 ### write sub file
@@ -67,7 +70,7 @@ if opts.verbose:
 f = open(subname, 'w')
 f.write('''universe = %(universe)s
 executable = %(exe)s
-arguments = "$(psd) --f-min %(fmin)d --f-max %(fmax)d --y-min %(ymin)e --y-max %(ymax)e --outdir %(outdir)s --tag %(tag)s"
+arguments = "$(psd) --f-min %(fmin)d --f-max %(fmax)d --y-min %(ymin)e --y-max %(ymax)e --output-dir %(outdir)s --tag %(tag)s -v"
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s

@@ -6,6 +6,8 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 
 #-------------------------------------------------
 
+import os
+
 import gzip
 
 import exposureUtils as utils
@@ -51,9 +53,6 @@ assert len(args)==4, 'please supply exactly 4 arguments\n%s'%__usage__
 channel, frametype = args[:2]
 gpsstart, gpsstop = [int(_) for _ in args[2:]]
 
-if opts.tag:
-    opts.tag = "_"+opts.tag
-
 assert channel[0]==frametype[0], 'I do not believe you want a channel and frametype \
 from different IFOs\n\tchannel : %s\n\tframetype : %s\n%s'%(channel, frametype, __usage__)
 
@@ -65,6 +64,12 @@ optDict = {
     'observatory' : channel[0],
     'frametype' : frametype,
 }
+
+if opts.tag:
+    opts.tag = "_"+opts.tag
+
+if not os.path.exists(opts.output_dir):
+    os.makedirs(opts.output_dir)
 
 opts.verbose |= opts.Verbose
 
@@ -103,6 +108,8 @@ if opts.verbose:
     print( cmd )
 frames = []
 for frame in sp.Popen(cmd.split(), stdout=sp.PIPE).communicate()[0].replace('file://localhost','').strip().split('\n'):
+    if opts.Verbose:
+        print( frame )
     s, d = utils.extract_start_dur(frame)
     frames.append( (frame, s, d) )
 
@@ -118,7 +125,7 @@ n = 1 + 1.*(gpsstop - gpsstart - opts.seglen)/(opts.seglen - opts.overlap)
 assert n%1==0, 'must be an integer number of segments used to compute PSD! Check your combination of gpsstart, gpsstop, --seglen, and --overlap'
 n = int(n)
 
-overlap = 1.*opts.overlap/opts.seglen
+overlap = 1.*opts.overlap/opts.seglen ### the fractional overlap we want
 if opts.verbose:
     print( 'estimating PSD using %d segments with %.3f fractional overlap'%(n, overlap) )
 psd, freqs = dft.estimate_psd(vect, num_segs=n, overlap=overlap, dt=dt, tukey_alpha=opts.tukey_alpha)

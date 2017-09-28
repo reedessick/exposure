@@ -6,6 +6,8 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 
 #-------------------------------------------------
 
+import os
+
 from optparse import OptionParser
 
 #-------------------------------------------------
@@ -21,6 +23,9 @@ opts, args = parser.parse_args()
 
 if opts.tag:
     opts.tag = "_"+opts.tag
+
+if not os.path.exists(opts.output_dir):
+    os.makedirs(opts.output_dir)
 
 #-------------------------------------------------
 

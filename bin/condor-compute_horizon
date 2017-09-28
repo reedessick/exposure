@@ -7,6 +7,7 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 #-------------------------------------------------
 
 import os
+
 import getpass
 
 from optparse import OptionParser
@@ -52,6 +53,9 @@ opts, args = parser.parse_args()
 if opts.tag:
     opts.tag = "_"+opts.tag
 
+if not os.path.exists(opts.output_dir):
+    os.makedirs(opts.output_dir)
+
 #-------------------------------------------------
 
 ### write sub file
@@ -61,7 +65,7 @@ if opts.verbose:
 f = open(subname, 'w')
 f.write('''universe = %(universe)s
 executable = %(exe)s
-arguments = "$(psd) --output-dir %(outdir)s --tag $(tag) --flow %(flow)d --fhigh %(fhigh)d --distance %(distance)f --snr-thr %(snr_thr)f"
+arguments = "$(psd) --output-dir %(outdir)s --tag $(tag) --flow %(flow)d --fhigh %(fhigh)d --distance %(distance)f --snr-thr %(snr_thr)f -v"
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
