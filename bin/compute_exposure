@@ -1,0 +1,53 @@
+#!/usr/bin/env python
+
+__usage__ = "compute_exposure [--options] network.fits.gz network.fits.gz ..."
+__description__ = ""
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import numpy as np
+import healpy as hp
+
+import stats ### FIXME: call out this dependency in README
+
+from optparse import OptionParser
+
+#-------------------------------------------------
+
+parser = OptionParser(usage=__usage__, description=__description__)
+
+parser.add_option('-v', '--verbose', default=False, action='store_true')
+
+parser.add_option('', '--nside', default=256, type='int',
+    help='resample all network.fits.gz to this NSIDE before summing')
+
+parser.add_option('', '--do-no-normalize', default=False, action='store_true',
+    help='do not normalize total exposure so it sums to 1')
+
+parser.add_option('-o', '--output-dir', default='.', type='string')
+parser.add_option('-t', '--tag', default='', type='string')
+
+opts, args = parser.parse_args()
+
+assert len(args), 'please supply at least one input argument\n%s'%__usage__
+
+if opts.tag:
+    opts.tag = "_"+opts.tag
+
+#-------------------------------------------------
+
+exposure = np.zeros((hp.nside2npix(opts.nside),), dtype=float)
+
+for path in args:
+    if opts.verbose:
+        print( "reading : "+path )
+    exposure += stats.resample(hp.read_map(path, verbose=False), opts.nside)
+
+if not opts.do_no_normalize:
+    exposure /= np.sum(exposure)
+
+path = "%s/exposure%s.fits.gz"%(opts.output_dir, opts.tag)
+if opts.verbose:
+    print( "writing : "+path )
+hp.write_map(path, exposure, coord='C')

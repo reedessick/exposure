@@ -9,9 +9,8 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 import numpy as np
 import healpy as hp
 
-import detector_cache
-
-import triangulate ### may want to copy this into this repo or make a note of the dependency...
+import detector_cache ### FIXME: call out this dependency in README
+import triangulate ### FIXME: call out this dependency in README
 
 from optparse import OptionParser
 

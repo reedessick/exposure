@@ -6,7 +6,7 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 
 #-------------------------------------------------
 
-import utils
+import exposureUtils as utils
 
 import getpass ### for default accounting_group_user
 
