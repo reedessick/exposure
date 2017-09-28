@@ -15,3 +15,14 @@ This is a simple library that's meant to compute the exposure of a network of GW
     - `compute_exposure`
 
 The work flow will likely run in this order. We note that there is further parallelization available by writing a single DAG that combines compute_psd, compute_horizon, and compute_network_sensitivity together with appropriate parent/child relationships. We could add compute_exposure to that as well, but it will require all jobs to finish prior and therefore might as well just be a postscript or run by hand afterwards.
+
+We also provide some basic functionality to estimate diurnal cycles.
+
+  - compute a stacked histogram (with some user-specified periodicity)
+    - diurnal_hist
+
+  - compute the dft of lock segments and run a peak finding algorithm to identify periodic components
+    - diuranl_dft
+
+  - compute a time-frequency representation of lock segments to look for variabilitoy of periodic elements
+    - diurnal_timefreq

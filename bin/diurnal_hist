@@ -1,0 +1,27 @@
+#!/usr/bin/env python
+
+__usage__ = "diurnal_hist [--options] gpsstart gpsstop"
+__description__ = "compute a stacked histogram with a user-defined periodicity to estimate diurnal cycles"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+from optparse import OptionParser
+
+#-------------------------------------------------
+
+parser = OptionParser(usage=__usage__, description=__description__)
+
+parser.add_option('-v', '--verbose', default=False, action='store_true')
+
+parser.add_option('-o', '--output-dir', default='.', type='string')
+parser.add_option('-t', '--tag', default='', type='string')
+
+opts, args = parser.parse_args()
+
+if opts.tag:
+    opts.tag = "_"+opts.tag
+
+#-------------------------------------------------
+
+raise NotImplementedError
