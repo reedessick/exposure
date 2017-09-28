@@ -20,11 +20,11 @@ def vec_from_frames(frames, channel, start, stop, verbose=False):
         """
         vecs = []
         dt = 0
-        for frame, strt, dur in frames:
+        for frame, frame_start, frame_dur in frames:
                 if verbose: 
                     print( frame )
-                s = max(strt, start)
-                d = min(start+dur,stop) - s
+                s = max(frame_start, start)
+                d = min(frame_start+frame_dur,stop) - s
                 vec, gpstart, offset, dt, _, _ = Fr.frgetvect1d(frame, channel, start=s, span=d)
                 vecs.append( vec )
         vec = np.concatenate(vecs)

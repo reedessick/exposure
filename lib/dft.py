@@ -184,20 +184,20 @@ def __resample_lowpass(vec, dt, new_dt):
 def estimate_psd(vec, num_segs=1, overlap=0, dt=1.0, tukey_alpha=0.1):
         """
         estimates the PSD using a DFT
-        divides vec into "num_segs" with "overlap" shared entries between neighbors
+        divides vec into "num_segs" with a fractional overlap of "overlap" between neighbors
         returns the average PSD from these samples
 
         WARNING: your logic on how to split segments may be fragile...
-
         """
         N = len(vec)
         if overlap > N - num_segs:
                 raise ValueError, "overlap is too big!"
 
-        n = 1.0*N/num_segs + (num_segs-1.0)/num_segs * overlap ### number of elements per segment
+        n = N/(1. + (num_segs-1.)*(1.-overlap)) ### compute the number of entries per segment
 
+        overlap = int(n*overlap) ### compute the number of overlapping entries
         n = int(n)
-        overlap = int(overlap)
+
         seglen = dt*n
 
         ### compute dfts for each segment separately
