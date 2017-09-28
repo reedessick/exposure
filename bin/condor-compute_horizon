@@ -10,6 +10,8 @@ import os
 
 import getpass
 
+import exposureUtils as utils
+
 from optparse import OptionParser
 
 #-------------------------------------------------
@@ -51,7 +53,9 @@ parser.add_option('-s', '--condor-submit', default=False, action='store_true',
 opts, args = parser.parse_args()
 
 if opts.tag:
-    opts.tag = "_"+opts.tag
+    filetag = "_"+opts.tag
+else:
+    filetag = ""
 
 if not os.path.exists(opts.output_dir):
     os.makedirs(opts.output_dir)
@@ -59,26 +63,17 @@ if not os.path.exists(opts.output_dir):
 #-------------------------------------------------
 
 ### write sub file
-subname = "%s/compute_horizon%s.sub"%(opts.output_dir, opts.tag)
+subname = "%s/compute_horizon%s.sub"%(opts.output_dir, filetag)
 if opts.verbose:
     print( "writing : "+subname )
 f = open(subname, 'w')
-f.write('''universe = %(universe)s
-executable = %(exe)s
-arguments = "$(psd) --output-dir %(outdir)s --tag $(tag) --flow %(flow)d --fhigh %(fhigh)d --distance %(distance)f --snr-thr %(snr_thr)f -v"
-getenv = true
-accounting_group = %(accounting_group)s
-accounting_group_user = %(accounting_group_user)s
-log    = %(outdir)s/condor-compute_horizon%(tag)s_$(Cluster)-$(Process).log
-error  = %(outdir)s/condor-compute_horizon%(tag)s_$(Cluster)-$(Process).err 
-output = %(outdir)s/condor-compute_horizon%(tag)s_$(Cluster)-$(Process).out
-notification = never
-queue 1'''%{\
+f.write(utils.compute_horizon_sub%{\
     'universe' : opts.universe,
     'exe' : opts.exe,
     'accounting_group' : opts.accounting_group,
     'accounting_group_user' : opts.accounting_group_user,
     'outdir' : opts.output_dir,
+    'filetag' : filetag,
     'flow' : opts.flow,
     'fhigh' : opts.fhigh,
     'distance' : opts.distance,
@@ -92,14 +87,9 @@ if opts.verbose:
     print( "writing : "+dagname )
 f = open(dagname, 'w')
 
-template = '''\
-JOB   %(jobid)s %(sub)s
-VARS  %(jobid)s path="%(path)s tag=%{tag}s"
-RETRY %(jobid)s %(retry)d
-'''
 for path in args:
     tag = os.path.basename(path).strip('.txt.gz')
-    f.write(template%{\
+    f.write(utils.compute_horizon_dag%{\
         'sub' : subname,
         'jobid' : tag, 
         'path' : path,
@@ -116,3 +106,6 @@ if opts.condor_submit:
         print( 'submitting : '+dagname )
     import subprocess as sp
     sp.Popen(['condor_submit_dag', dagname]).wait()
+
+elif opts.verbose:
+    print( 'you can now submit : '+dagname )

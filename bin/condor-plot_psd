@@ -10,6 +10,8 @@ import os
 
 import getpass ### for default accounting_group_user
 
+import exposureUtils as utils
+
 from optparse import OptionParser
 
 #-------------------------------------------------
@@ -53,7 +55,9 @@ parser.add_option('-s', '--condor-submit', default=False, action='store_true',
 opts, args = parser.parse_args()
 
 if opts.tag:
-    opts.tag = "_"+opts.tag
+    filetag = "_"+opts.tag
+else:
+    filetag = ""
 
 if not opts.figtype:
     opts.figtype.append( 'png' )
@@ -68,23 +72,14 @@ subname = "%s/plot_psd%s.sub"%(opts.output_dir, opts.tag)
 if opts.verbose:
     print( "writing : "+subname )
 f = open(subname, 'w')
-f.write('''universe = %(universe)s
-executable = %(exe)s
-arguments = "$(psd) --f-min %(fmin)d --f-max %(fmax)d --y-min %(ymin)e --y-max %(ymax)e --output-dir %(outdir)s --tag %(tag)s -v"
-getenv = true
-accounting_group = %(accounting_group)s
-accounting_group_user = %(accounting_group_user)s
-log    = %(outdir)s/condor-compute_psd%(tag)s_$(Cluster)-$(Process).log
-error  = %(outdir)s/condor-compute_psd%(tag)s_$(Cluster)-$(Process).err 
-output = %(outdir)s/condor-compute_psd%(tag)s_$(Cluster)-$(Process).out
-notification = never
-queue 1'''%{\
+f.write(utils.plot_psd_sub%{\
     'universe' : opts.universe,
     'exe' : opts.exe,
     'accounting_group' : opts.accounting_group,
     'accounting_group_user' : opts.accounting_group_user,
     'outdir' : opts.output_dir,
-    'tag' : opts.tag,
+    'tag' : "--tag "+opts.tag if opts.tag else '',
+    'filetag' : filetag,
     'fmin' : opts.f_min,
     'fmax' : opts.f_max,
     'ymin' : opts.y_min,
@@ -98,19 +93,13 @@ if opts.verbose:
     print( "writing : "+dagname )
 f = open(dagname, 'w')
 
-template = '''\
-JOB   %(jobid)s %(sub)s
-VARS  %(jobid)s psd="%(path)s""
-RETRY %(jobid)s %(retry)d
-'''
 for path in args:
-    f.write(template%{\
+    f.write(utils.plot_psd_dag%{\
         'sub' : subname,
         'jobid' : os.path.basename(path).strip('.txt.gz'), 
         'path' : path,
         'retry' : opts.retry,
     })
-    s += opts.win
 
 f.close()
 
@@ -122,3 +111,6 @@ if opts.condor_submit:
         print( 'submitting : '+dagname )
     import subprocess as sp
     sp.Popen(['condor_submit_dag', dagname]).wait()
+
+elif opts.verbose:
+    print( 'you can now submit : '+dagname )

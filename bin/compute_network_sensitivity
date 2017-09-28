@@ -7,9 +7,12 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 #-------------------------------------------------
 
 import os
+import gzip
 
 import numpy as np
 import healpy as hp
+
+import exposureUtils as utils
 
 import detector_cache ### FIXME: call out this dependency in README
 import triangulate ### FIXME: call out this dependency in README
@@ -55,7 +58,7 @@ horizons = []
 for ifo, path in opts.ifo_horizon:
     if opts.verbose:
         print( '%s -> %s'%(ifo, path) )
-    f = open(path, 'r')
+    f = gzip.open(path, 'r')
     horizons.append( (ifo, float(f.readline().strip())) )
     f.close()
 
@@ -80,7 +83,17 @@ for gps in args:
 
     network = network**0.5
 
-    path = "%s/network_sensitivity%s-%d.fits"%(opts.output_dir, opts.tag, gps)
+    path = utils.sensitivity_path(opts.output_dir, opts.tag, gps, gzip=False)
     if opts.verbose:
         print( "writing : "+path )
     hp.write_map(path, network, coord='C', extra_header=horizons+[('gps', gps)])
+
+    gzpath = utils.sensitivity_path(opts.output_dir, opts.tag, gps, gzip=True)
+    if opts.verbose:
+        print( "gzipping : %s -> %s"%(path, gzpath) )
+    f = open(path, 'r')
+    gzf = gzip.open(gzpath, 'w')
+    gzf.write(f.read())
+    gzf.close()
+    f.close()
+    os.remove(path) ### get rid of the extra copy

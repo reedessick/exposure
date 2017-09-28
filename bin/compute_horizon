@@ -7,8 +7,11 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 #-------------------------------------------------
 
 import os
+import gzip
 
 import numpy as np
+
+import exposureUtils as utils
 
 from optparse import OptionParser
 
@@ -43,26 +46,26 @@ if not os.path.exists(opts.output_dir):
 
 #-------------------------------------------------
 
-gpstag = '-'.join(args[0].strip('.txt.gz').split('-')[-2:]) ### need this to identify time range of data used
-
 if opts.verbose:
     print( "reading : "+args[0] )
 freq, psd = np.loadtxt(args[0]).transpose()
 df = freq[1]-freq[0]
 
-### compute strain amplitude
-truth = opts.flow<=freq<=opts.fhigh
+gpstart, gpsdur = [int(_) for _ in args[0].strip('.txt.gz').split('-')[-2:]] ### need this to identify time range of data used
 
-h_of_f = 1e-23 * (100./opts.distance) (freq[truth]/100.)**(7./6) ### FIXME: a crappy approximation for the conformal PN strain...(up to a prefactor)
+### compute strain amplitude
+truth = (opts.flow<=freq)*(freq<=opts.fhigh)
+
+h_of_f = 1e-23 * (100./opts.distance) * (freq[truth]/100.)**(7./6) ### FIXME: a crappy approximation for the conformal PN strain...(up to a prefactor)
 
 ### compute the optimal SNR for this strain
-snr = (4.*np.trapz(h_of_f**2./psd[truth], x=freqs[truth]))**0.5 ### approximate the integral
+snr = (4.*np.trapz(h_of_f**2./psd[truth], x=freq[truth]))**0.5 ### approximate the integral
 
 ### compute the horizon from this
 horizon = opts.distance * snr/opts.snr_thr ### this is the scaling, again making some broad approximations
 
 ### save
-path = "%s/horizon%s%s.txt.gz"%(opts.output_dir, opts.tag, gpstag)
+path = utils.horizon_path(opts.output_dir, opts.tag, gpstart, gpsdur)
 if opts.verbose:
     print( 'writing : '+path )
 f = gzip.open(path, 'w')

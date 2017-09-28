@@ -85,7 +85,9 @@ optDict = {
 }
 
 if opts.tag:
-    opts.tag = "_"+opts.tag
+    filetag = "_"+opts.tag
+else:
+    filetag = ""
 
 if not os.path.exists(opts.output_dir):
     os.makedirs(opts.output_dir)
@@ -94,30 +96,10 @@ if not os.path.exists(opts.output_dir):
 
 ### query segments to define individual runs
 ### ensure we have proper coverage
-query_cmd = "ligolw_segment_query_dqsegdb -q -t https://segments.ligo.org -a %(flag)s -s %(gpsstart)d -e %(gpsstop)d"
-print_cmd = "ligolw_print -c start_time -c end_time -t segment".split()
-
 segments = [[gpsstart, gpsstop]]
 
-for flag in opts.include_flag:
-    optDict['flag'] = flag
-    cmd = query_cmd%optDict
-    if opts.verbose:
-        print( cmd )
-    segs = sp.Popen(cmd.split(), stdout=sp.PIPE).communicate()[0]
-    segs = [[int(_) for _ in seg.split(',')] for seg in sp.Popen(print_cmd, stdin=sp.PIPE, stdout=sp.PIPE).communicate(segs)[0].strip('\n').split('\n')]
-
-    segments = utils.andsegments(segments, segs)
-
-for flag in opts.exclude_flag:
-    optDict['flag'] = flag
-    cmd = query_cmd%optDict
-    if opts.verbose:
-        print( cmd )
-    segs = sp.Popen(cmd.split(), stdout=sp.PIPE).communicate()[0]
-    segs = [[int(_) for _ in seg.split(',')] for seg in sp.Popen(print_cmd, stdin=sp.PIPE, stdout=sp.PIPE).communicate(segs)[0].strip('\n').split('\n')]
-
-    segments = utils.andsegments(segments, utils.invsegments(gpsstart, gpsstop, segs))
+segments = utils.include_flags(segments, opts.include_flag, optDict, verbose=opts.verbose)
+segments = utils.exclude_flags(segments, opts.exclude_flag, optDict, verbose=opts.verbose)
 
 ### check to make sure we have livetime left, etc
 assert len(segments), 'no remaining livetime after filtering by flags!'
@@ -125,21 +107,11 @@ assert len(segments), 'no remaining livetime after filtering by flags!'
 #------------------------
 
 ### write sub file
-subname = "%s/compute_psd%s.sub"%(opts.output_dir, opts.tag)
+subname = "%s/compute_psd%s.sub"%(opts.output_dir, filetag)
 if opts.verbose:
     print( "writing : "+subname )
 f = open(subname, 'w')
-f.write('''universe = %(universe)s
-executable = %(exe)s
-arguments = "%(channel)s %(frametype)s $(gpsstart) $(gpsstop) --seglen %(seglen)d --overlap %(overlap)d --tukey-alpha %(tukey_alpha)f --output-dir %(outdir)s --tag %(tag)s -V"
-getenv = true
-accounting_group = %(accounting_group)s
-accounting_group_user = %(accounting_group_user)s
-log    = %(outdir)s/condor-compute_psd%(tag)s_$(Cluster)-$(Process).log
-error  = %(outdir)s/condor-compute_psd%(tag)s_$(Cluster)-$(Process).err 
-output = %(outdir)s/condor-compute_psd%(tag)s_$(Cluster)-$(Process).out
-notification = never
-queue 1'''%{\
+f.write(utils.compute_psd_sub%{\
     'universe' : opts.universe,
     'exe' : opts.exe,
     'channel' : channel,
@@ -147,7 +119,8 @@ queue 1'''%{\
     'accounting_group' : opts.accounting_group,
     'accounting_group_user' : opts.accounting_group_user,
     'outdir' : opts.output_dir,
-    'tag' : opts.tag,
+    'tag' :  "--tag "+opts.tag if opts.tag else '',
+    'filetag' : filetag,
     'start' : gpsstart,
     'dur' : gpsstop-gpsstart,
     'seglen' : opts.seglen,
@@ -162,11 +135,6 @@ if opts.verbose:
     print( "writing : "+dagname )
 f = open(dagname, 'w')
 
-template = '''\
-JOB   %(gpsstart)d %(sub)s
-VARS  %(gpsstart)d gpsstart="%(gpsstart)d" gpsstop="%(gpsstop)d"
-RETRY %(gpsstart)d %(retry)d
-'''
 for segstart, segstop in segments:
     segdur = segstop - segstart
     if opts.verbose:
@@ -177,7 +145,8 @@ for segstart, segstop in segments:
         s += opts.win 
 
     while s < segstop:
-        f.write(template%{\
+        f.write(utils.compute_psd_dag%{\
+            'jobid' : '%d'%gpsstart,
             'sub' : subname,
             'gpsstart' : s, 
             'gpsstop' : s+opts.win,
@@ -195,3 +164,6 @@ if opts.condor_submit:
         print( 'submitting : '+dagname )
     import subprocess as sp
     sp.Popen(['condor_submit_dag', dagname]).wait()
+
+elif opts.verbose:
+    print( 'you can now submit : '+dagname )

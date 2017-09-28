@@ -76,29 +76,10 @@ opts.verbose |= opts.Verbose
 #-------------------------------------------------
 
 ### ensure we have proper coverage
-query_cmd = "ligolw_segment_query_dqsegdb -q -t https://segments.ligo.org -a %(flag)s -s %(gpsstart)d -e %(gpsstop)d"
-print_cmd = "ligolw_print -c start_time -c end_time -t segment".split()
-for flag in opts.include_flag:
-    optDict['flag'] = flag
-    cmd = query_cmd%optDict
-    if opts.verbose:
-        print( cmd )
-    segs = sp.Popen(cmd.split(), stdout=sp.PIPE).communicate()[0]
-    segs = [[float(_) for _ in seg.split(',')] for seg in sp.Popen(print_cmd, stdin=sp.PIPE, stdout=sp.PIPE).communicate(segs)[0].strip('\n').split('\n')]
+segments = [[gpsstart, gpsstop]]
 
-    if len(segs)!=1 or segs[0][0]!=gpsstart or segs[0][1]!=gpsstop:
-        raise Exception, 'include-flag=%s was not active throughout the entire requested time'%flag
-
-for flag in opts.exclude_flag:
-    optDict['flag'] = flag
-    cmd = query_cmd%optDict
-    if opts.verbose:
-        print( cmd )
-    segs = sp.Popen(cmd.split(), stdout=sp.PIPE).communicate()[0]
-    segs = [[float(_) for _ in seg.split(',')] for seg in sp.Popen(print_cmd, stdin=sp.PIPE, stdout=sp.PIPE).communicate(segs)[0].strip('\n').split('\n')]
-
-    if len(segs):
-        raise Exception, 'exclude-flag=%s was active during requested time'%flag
+segments = utils.include_flags(segments, opts.include_flag, optDict, verbose=opts.verbose)
+segments = utils.exclude_flags(segments, opts.exclude_flag, optDict, verbose=opts.verbose)
 
 #------------------------
 
@@ -131,7 +112,7 @@ if opts.verbose:
 psd, freqs = dft.estimate_psd(vect, num_segs=n, overlap=overlap, dt=dt, tukey_alpha=opts.tukey_alpha)
 
 ### write PSD
-path = "%s/psd%s-%d-%d.txt.gz"%(opts.output_dir, opts.tag, gpsstart, gpsstop-gpsstart)
+path = utils.psd_path(opts.output_dir, opts.tag, gpsstart, gpsstop-gpsstart)
 if opts.verbose:
     print( "writing : "+path )
 template = '%.9f %.9e'
