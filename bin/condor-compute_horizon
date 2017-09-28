@@ -1,14 +1,13 @@
 #!/usr/bin/env python
 
-__usage__ = "condor-compute_network_sensitivity [--options] ifoA pathA1,pathA2,... ifoB pathB1,pathB2,... ..."
-__description__ = "massive parallelization of compute_network_sensitivity. We perform the matching association to figure out what IFOs are available when based on the path names"
+__usage__ = 'condor-compute_horizon [--options] psd.txt.gz psd.txt.gz ...'
+__description__ = "massive parallelizatoin of compute_horizon"
 __author__ = "Reed Essick (reed.essick@ligo.org)"
 
 #-------------------------------------------------
 
+import os
 import getpass
-
-from collections import defaultdict
 
 from optparse import OptionParser
 
@@ -18,11 +17,21 @@ parser = OptionParser(usage=__usage__, description=__description__)
 
 parser.add_option("-v", "--verbose", default=False, action="store_true")
 
+parser.add_option('', '--flow', default=32, type='float',
+    help='DEFAULT=32')
+parser.add_option('', '--fhigh', default=1024, type='float',
+    help='DEFAULT=1024')
+
+parser.add_option('', '--distance', default=100, type='float',
+    help='an arbitrary choice for the distance scale used to calculate the SNR and estimate the horizon')
+parser.add_option('', '--snr-thr', default=8, type='float',
+    help='an arbitrary snr threshold defining what is detectable. Used to estimate the horizon')
+
 parser.add_option('', '--universe', default='vanilla', type='string',
     help='DEFAULT=vanilla')
-parser.add_option('', '--exe', default='compute_psd', type='string',
+parser.add_option('', '--exe', default='compute_horizon', type='string',
     help='specify the explicit path to the executable. \
-DEFAULT=compute_psd')
+DEFAULT=compute_horizon')
 
 parser.add_option('', '--accounting-group', default='ligo.dev.o1.burst.explore.test', type='string',
     help='DEFAULT=ligo.dev.o1.burst.explore.test')
@@ -40,48 +49,36 @@ parser.add_option('-s', '--condor-submit', default=False, action='store_true',
 
 opts, args = parser.parse_args()
 
-assert len(args)%2==0, 'please supply an evan number of input arguments\n%s'%__usage__
-
 if opts.tag:
     opts.tag = "_"+opts.tag
 
-#--------------------------------------------------
-
-### set up associations with which IFOs are available when
-if opts.verbose:
-    print( "sorting IFO horizon estiamtes by gps ranges" )
-gpstimes = defaultdict( dict )
-i = 0
-while i < len(args):
-    ifo = args[i]
-    for path in args[i+1]:
-        gpstimes[utils.extract_start_dur(path, suffix='.txt.gz')].update( (ifo, path) )        
-    i += 2
-
-#--------------------------------------------------
+#-------------------------------------------------
 
 ### write sub file
-subname = "%s/compute_network_sensitivity%s.sub"%(opts.output_dir, opts.tag)
+subname = "%s/compute_horizon%s.sub"%(opts.output_dir, opts.tag)
 if opts.verbose:
     print( "writing : "+subname )
 f = open(subname, 'w')
 f.write('''universe = %(universe)s
 executable = %(exe)s
-arguments = "$(gps) $(ifo_horizons) --nside %(nside)d --outdir %(outdir)s --tag $(tag)"
+arguments = "$(psd) --output-dir %(outdir)s --tag $(tag) --flow %(flow)d --fhigh %(fhigh)d --distance %(distance)f --snr-thr %(snr_thr)f"
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
-log    = %(outdir)s/condor-compute_network_sensitivity%(tag)s_$(Cluster)-$(Process).log
-error  = %(outdir)s/condor-compute_network_sensitivity%(tag)s_$(Cluster)-$(Process).err 
-output = %(outdir)s/condor-compute_network_sensitivity%(tag)s_$(Cluster)-$(Process).out
+log    = %(outdir)s/condor-compute_horizon%(tag)s_$(Cluster)-$(Process).log
+error  = %(outdir)s/condor-compute_horizon%(tag)s_$(Cluster)-$(Process).err 
+output = %(outdir)s/condor-compute_horizon%(tag)s_$(Cluster)-$(Process).out
 notification = never
 queue 1'''%{\
     'universe' : opts.universe,
     'exe' : opts.exe,
     'accounting_group' : opts.accounting_group,
     'accounting_group_user' : opts.accounting_group_user,
-    'nside' : opts.nside,
     'outdir' : opts.output_dir,
+    'flow' : opts.flow,
+    'fhigh' : opts.fhigh,
+    'distance' : opts.distance,
+    'snr_thr' : opts.snr_thr,
 })
 f.close()
 
@@ -92,17 +89,18 @@ if opts.verbose:
 f = open(dagname, 'w')
 
 template = '''\
-JOB   %(gpsstart)d %(sub)s
-VARS  %(gpsstart)d gps="%(gps)d" tag="%(tag)s" ifo_horizons="%(ifo_horizons)s"
-RETRY %(gpsstart)d %(retry)d
+JOB   %(jobid)s %(sub)s
+VARS  %(jobid)s path="%(path)s tag=%{tag}s"
+RETRY %(jobid)s %(retry)d
 '''
-for (start, dur), ifos in gpstimes.items():
+for path in args:
+    tag = os.path.basename(path).strip('.txt.gz')
     f.write(template%{\
-        'gpsstart' : start,
         'sub' : subname,
-        'gps' : start + 0.5*dur, ### take the center of the window, which should be good enough...
-        'tag' : opts.tag+'-%d-%d'%(start, dur),
-        'ifo_horizons' : '--ifo-horizon '+' --ifo-horizon '.join('%s %s'%tuple(pair) for pair in ifos.items()),
+        'jobid' : tag, 
+        'path' : path,
+        'tag' : tag+opts.tag,
+        'retry' : opts.retry,
     })
 f.close()
 

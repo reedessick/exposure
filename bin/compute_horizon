@@ -1,0 +1,65 @@
+#!/usr/bin/env python
+
+__usage__ = "compute_horizon [--options] psd.txt.gz"
+__description__ = "computes the expected range given the PSD. NOTE: this is only an approximation to the range using a very basic PN expression for a conformal waveform strain in the frequency domain. We may want to improve this by actually calling waveform generators to compute the strain"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import numpy as np
+
+from optparse import OptionParser
+
+#-------------------------------------------------
+
+parser = OptionParser(usage=__usage__, description=__description__)
+
+parser.add_option('-v', '--verbose', default=False, action='store_true')
+
+parser.add_option('', '--flow', default=32, type='float',
+    help='DEFAULT=32')
+parser.add_option('', '--fhigh', default=1024, type='float',
+    help='DEFAULT=1024')
+
+parser.add_option('', '--distance', default=100, type='float',
+    help='an arbitrary choice for the distance scale used to calculate the SNR and estimate the horizon')
+parser.add_option('', '--snr-thr', default=8, type='float',
+    help='an arbitrary snr threshold defining what is detectable. Used to estimate the horizon')
+
+parser.add_option('-o', '--output-dir', default='.', type='string')
+parser.add_option('-t', '--tag', default='', type='string')
+
+opts, args = parser.parse_args()
+
+assert len(args)==1, 'please supply exactly 1 input argument\n%s'%__usage__
+
+if opts.tag:
+    opts.tag = "_"+opts.tag
+
+#-------------------------------------------------
+
+gpstag = '-'.join(args[0].strip('.txt.gz').split('-')[-2:]) ### need this to identify time range of data used
+
+if opts.verbose:
+    print( "reading : "+args[0] )
+freq, psd = np.loadtxt(args[0]).transpose()
+df = freq[1]-freq[0]
+
+### compute strain amplitude
+truth = opts.flow<=freq<=opts.fhigh
+
+h_of_f = 1e-23 * (100./opts.distance) (freq[truth]/100.)**(7./6) ### FIXME: a crappy approximation for the conformal PN strain...(up to a prefactor)
+
+### compute the optimal SNR for this strain
+snr = (4.*np.trapz(h_of_f**2./psd[truth], x=freqs[truth]))**0.5 ### approximate the integral
+
+### compute the horizon from this
+horizon = opts.distance * snr/opts.snr_thr ### this is the scaling, again making some broad approximations
+
+### save
+path = "%s/horizon%s%s.txt.gz"%(opts.output_dir, opts.tag, gpstag)
+if opts.verbose:
+    print( 'writing : '+path )
+f = gzip.open(path, 'w')
+f.write('%.9e\n%d\n%d\n%s'%(horizon, opts.flow, opts.fhigh, args[0]))
+f.close()

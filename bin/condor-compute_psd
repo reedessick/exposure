@@ -59,7 +59,11 @@ parser.add_option('', '--retry', default=0, type='int',
 parser.add_option("-o", "--output-dir", default='.', type='string')
 parser.add_option("-t", "--tag", default="", type='string')
 
+parser.add_option('-s', '--condor-submit', default=False, action='store_true',
+    help='submit the DAG to condor')
+
 opts, args = parser.parse_args()
+
 assert len(args)==4, 'please supply exactly 4 arguments\n%s'%__usage__
 channel, frametype = args[:2]
 gpsstart, gpsstop = [int(_) for _ in args[2:]]
@@ -120,13 +124,13 @@ if opts.verbose:
 f = open(subname, 'w')
 f.write('''universe = %(universe)s
 executable = %(exe)s
-arguments = "%(channel)s %(frametype)s $(gpsstart) $(gpsstop) $(seglen) $(overlap) $(tukey_alpha)"
+arguments = "%(channel)s %(frametype)s $(gpsstart) $(gpsstop) --seglen %(seglen)d --overlap %(overlap)d --tukey-alpha %(tukey_alpha)f --outdir %(outdir)s --tag %(tag)s"
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
-log    = %(outdir)s/condor-compute_psd%(tag)s-%(start)d-%(dur)d_$(Cluster)-$(Process).log
-error  = %(outdir)s/condor-compute_psd%(tag)s-%(start)d-%(dur)d_$(Cluster)-$(Process).err 
-output = %(outdir)s/condor-compute_psd%(tag)s-%(start)d-%(dur)d_$(Cluster)-$(Process).out
+log    = %(outdir)s/condor-compute_psd%(tag)s_$(Cluster)-$(Process).log
+error  = %(outdir)s/condor-compute_psd%(tag)s_$(Cluster)-$(Process).err 
+output = %(outdir)s/condor-compute_psd%(tag)s_$(Cluster)-$(Process).out
 notification = never
 queue 1'''%{\
     'universe' : opts.universe,
@@ -139,6 +143,9 @@ queue 1'''%{\
     'tag' : opts.tag,
     'start' : gpsstart,
     'dur' : gpsstop-gpsstart,
+    'seglen' : opts.seglen,
+    'overlap' : opts.overlap,
+    'tukey_alpha' : opts.tukey_alpha,
 })
 f.close()
 
@@ -155,21 +162,29 @@ RETRY %(gpsstart)d %(retry)d
 '''
 for segstart, segstop in segments:
     segdur = segstop - segstart
-    n = segdur/opts.win ### the largest number of segments I can fit here -> integer division
     if opts.verbose:
-        print( "scheduling %d jobs for %d -- %d"%(segstart, segstop) )
+        print( "scheduling jobs for %d -- %d"%(segstart, segstop) )
     
-    s = segstart + (segdur%opts.win)/2 ### add a buffer to try to center the PSDs within the segment
+    s = (segstart/opts.win)*opts.win ### line-up start with integer number of windows. Needed to guarantee files will line up later -> integer division!
+    if s < segstart: ### mostly likely case, but we need to check just in case
+        s += opts.win 
+
     while s < segstop:
         f.write(template%{\
+            'sub' : subname,
             'gpsstart' : s, 
             'gpsstop' : s+opts.win,
-            'seglen' : opts.seglen,
-            'overlap' : opts.overlap,
-            'tukey_alpha' : opts.tukey_alpha,
-            'sub' : subname, 
             'retry' : opts.retry,
         })
         s += opts.win
 
 f.close()
+
+#-------------------------------------------------
+
+### submit
+if opts.condor_submit:
+    if opts.verbose:
+        print( 'submitting : '+dagname )
+    import subprocess as sp
+    sp.Popen(['condor_submit_dag', dagname]).wait()

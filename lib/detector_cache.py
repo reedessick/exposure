@@ -131,31 +131,6 @@ class Detector(object):
         ny = %.5f , %.5f , %.5f
         PSD : %s"""%(self.name, self.dr[0], self.dr[1], self.dr[2], self.nx[0], self.nx[1], self.nx[2], self.ny[0], self.ny[1], self.ny[2], str(self.psd))
 
-
-#=================================================
-# path to psd cache
-#=================================================
-path = __file__.strip(__name__+".py")
-
-#=================================================
-# known PSDs
-#=================================================
-psds = {}
-
-default_psd = PSD(np.array([0]), np.array([1]), kind="linear")
-psds["default"] = default_psd
-
-### design psd's
-aligo_design_psd_file = path+'PSDs/aLIGO_design.txt'
-aligo_design_psd_dat = np.genfromtxt(aligo_design_psd_file)
-aligo_design_psd = PSD(aligo_design_psd_dat[:,0], aligo_design_psd_dat[:,1]**2, kind="linear")
-psds["aligo_design"] = aligo_design_psd
-
-avirgo_design_psd_file = path+'PSDs/aVirgo_design.txt'
-avirgo_design_psd_dat = np.genfromtxt(avirgo_design_psd_file)
-avirgo_design_psd = PSD(avirgo_design_psd_dat[:,0], avirgo_design_psd_dat[:,1]**2, kind="linear")
-psds["avirgo_design"] = avirgo_design_psd
-
 #=================================================
 # known detectors
 #=================================================
@@ -168,14 +143,14 @@ detectors = {}
 __H_dr__ = np.array((-2.161415, -3.834695, +4.600350))*1e6/c # sec
 __H_nx__ = np.array((-0.2239, +0.7998, +0.5569))
 __H_ny__ = np.array((-0.9140, +0.0261, -0.4049))
-detectors["H"] = Detector("H", __H_dr__, __H_nx__, __H_ny__, copy.deepcopy(aligo_design_psd))
+detectors["H"] = Detector("H", __H_dr__, __H_nx__, __H_ny__, None)
 
 __L_dr__ = np.array((-0.074276, -5.496284, +3.224257))*1e6/c # sec
 __L_nx__ = np.array((-0.9546, -0.1416, -0.2622))
 __L_ny__ = np.array((+0.2977, -0.4879, -0.8205))
-detectors["L"] = Detector("L", __L_dr__, __L_nx__, __L_ny__, copy.deepcopy(aligo_design_psd))
+detectors["L"] = Detector("L", __L_dr__, __L_nx__, __L_ny__, None)
 
 __V_dr__ = np.array((+4.546374, +0.842990, +4.378577))*1e6/c # sec
 __V_nx__ = np.array((-0.7005, +0.2085, +0.6826))
 __V_ny__ = np.array((-0.0538, -0.9691, +0.2408))
-detectors["V"] = Detector("V", __V_dr__, __V_nx__, __V_ny__, copy.deepcopy(avirgo_design_psd))
+detectors["V"] = Detector("V", __V_dr__, __V_nx__, __V_ny__, None)
