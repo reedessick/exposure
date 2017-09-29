@@ -79,9 +79,9 @@ for gps in args:
         if opts.Verbose:
             print( "    "+ifo )
         fp, fx = detector_cache.detectors[ifo].antenna_patterns(theta, phi, psi)
-        network += (np.abs(fp)**2 + np.abs(fx)**2)*horizon**2
+        network += (np.abs(fp)**2 + np.abs(fx)**2)*horizon**2 ### weight contribution from each ifo by ~1/PSD
 
-    network = network**0.5
+    network = network**0.5 ### record the sensitivity linear in ~F/ASD ~ range
 
     path = utils.sensitivity_path(opts.output_dir, opts.tag, gps, gzip=False)
     if opts.verbose:
