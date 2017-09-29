@@ -214,3 +214,23 @@ def invsegments(start, stop, segs):
         newsegments.append( [e, stop] )
 
     return newsegments
+
+def mergesegments(segments):
+    """
+    assumes segments are in the correct order and non-overlapping.
+    simply merges any touching segments into one bigger segemnt
+    """
+    if len(segments)<2:
+        return segments
+
+    segs = []
+    s, e = segments[0]
+    for S, E in segments[1:]:
+        if e==S:
+            e=E
+        else:
+            segs.append( [s,e] )
+            s = S
+            e = E
+    segs.append( [s, e] )
+    return segs

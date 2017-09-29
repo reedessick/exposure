@@ -99,7 +99,7 @@ for frame in sp.Popen(cmd.split(), stdout=sp.PIPE).communicate()[0].replace('fil
     frames.append( (frame, s, d) )
 
 ### insure we have full coverage
-segs = utils.andsegments(segments, [(s,s+d) for _, s, d in frames])
+segs = utils.andsegments(segments, utils.mergesegments([(s,s+d) for _, s, d in frames]))
 
 assert segs, 'no frame data found!'
 assert len(segs)==1, 'gap in frame data found!'
