@@ -75,7 +75,7 @@ parser.add_option('', '--nside', default=512, type='int',
 parser.add_option('', '--compute-exposure', default=False, action='store_true',
     help='add compute_exposure jobs to the DAG to stack everything together')
 
-parser.add_option('', '--do-no-normalize', default=False, action='store_true',
+parser.add_option('', '--do-not-normalize', default=False, action='store_true',
     help='do not normalize total exposure so it sums to 1')
 
 ### options for condor
@@ -208,7 +208,6 @@ for ifo, channel, frametype in opts.ifo_specs:
         'exe' : opts.horizon_exe,
         'accounting_group' : opts.accounting_group,
         'accounting_group_user' : opts.accounting_group_user,
-        'outdir' : opts.output_dir,
         'filetag' : filetag,
         'flow' : opts.flow,
         'fhigh' : opts.fhigh,
@@ -229,6 +228,8 @@ for ifo, channel, frametype in opts.ifo_specs:
 
         while s < segstop:
             outdir = utils.gps2dir(opts.output_dir, s, opts.win)
+            if not os.path.exists(outdir):
+                os.makedirs(outdir)
 
             ### add the PSD generation
             dag.write(utils.compute_psd_dag%{\
@@ -284,7 +285,7 @@ sen_sub.write(utils.compute_network_sensitivity_sub%{\
 sen_sub.close()
 
 for s, ifos in time_periods.items():
-    outdir = utils.gps2dir(opts.output_dir, s, opts.win)
+    outdir = utils.gps2dir(opts.output_dir, s, opts.win) ### should already exist!
     gps = s + 0.5*opts.win ### take the center of the window, which should be good enough...
     dag.write(utils.compute_network_sensitivity_dag%{\
         'jobid' : '%d'%s,
