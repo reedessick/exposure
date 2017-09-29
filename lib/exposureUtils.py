@@ -123,8 +123,8 @@ def sensitivity_path(output_dir, tag, gps, gzip=False):
         ans = ans+".gz"
     return ans
 
-def gp2dir(directory, start, dur):
-    return "%s/%d/%d-%d/"%(directory, start%100000, start, dur)
+def gps2dir(directory, start, dur):
+    return "%s/%d/%d-%d/"%(directory, int(start)/100000, start, dur)
 
 #-------------------------------------------------
 

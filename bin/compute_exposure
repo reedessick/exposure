@@ -24,7 +24,7 @@ parser.add_option('-v', '--verbose', default=False, action='store_true')
 parser.add_option('', '--nside', default=256, type='int',
     help='resample all network.fits.gz to this NSIDE before summing')
 
-parser.add_option('', '--do-no-normalize', default=False, action='store_true',
+parser.add_option('', '--do-not-normalize', default=False, action='store_true',
     help='do not normalize total exposure so it sums to 1')
 
 parser.add_option('-o', '--output-dir', default='.', type='string')
@@ -49,7 +49,7 @@ for path in args:
         print( "reading : "+path )
     exposure += stats.resample(hp.read_map(path, verbose=False), opts.nside)
 
-if not opts.do_no_normalize:
+if not opts.do_not_normalize:
     exposure /= np.sum(exposure)
 
 path = "%s/exposure%s.fits.gz"%(opts.output_dir, opts.tag)
