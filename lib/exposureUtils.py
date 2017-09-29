@@ -209,8 +209,8 @@ def invsegments(start, stop, segs):
     for s, e in segs:
         if start < s <= stop:
             newsegments.append( [start, s] )
-        else:
-            start = e
+        start = e
     if e < stop:
         newsegments.append( [e, stop] )
+
     return newsegments
