@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+
+__usage__ = "condor-plot_maps [--options] fits.gz fits.gz ..."
+__description__ = "schedule many plotting jobs for individual fits files, typically for those produced by condor-compute_network_sensitivity"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import os
+
+from optparse import OptionParser
+
+#-------------------------------------------------
+
+parser = OptionParser(usage=__usage__, description=__description__)
+
+parser.add_option("-v", "--verbose", default=False, action="store_true")
+
+parser.add_option('', '--universe', default='vanilla', type='string',
+    help='DEFAULT=vanilla')
+parser.add_option('', '--exe', default='compute_psd', type='string',
+    help='specify the explicit path to the executable. \
+DEFAULT=compute_psd')
+
+parser.add_option('', '--accounting-group', default='ligo.dev.o1.burst.explore.test', type='string',
+    help='DEFAULT=ligo.dev.o1.burst.explore.test')
+parser.add_option('', '--accounting-group-user', default=getpass.getuser(), type='string',
+    help='DEFAULT='+getpass.getuser())
+
+parser.add_option('', '--retry', default=0, type='int',
+    help='DEFAULT=0')
+
+parser.add_option("-o", "--output-dir", default='.', type='string')
+parser.add_option("-t", "--tag", default="", type='string')
+
+parser.add_option('-s', '--condor-submit', default=False, action='store_true',
+    help='submit the DAG to condor')
+
+opts, args = parser.parse_args()
+assert len(args), 'please supply at least 1 input argument\n%s'%__usage__
+
+if opts.tag:
+    filetag = "_"+opts.tag
+
+else:
+    filetag = ''
+
+if not os.path.exists(opts.output_dir):
+    os.makedirs(opts.output_dir)
+
+#-------------------------------------------------
+
+raise NotImplementedError, '''\
+need to write a SUB template and DAG template within exposureUtils
+then basically just iterate through args and define one job for each
+'''
