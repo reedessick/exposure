@@ -86,7 +86,8 @@ for gps in args:
     path = utils.sensitivity_path(opts.output_dir, opts.tag, gps, gzip=False)
     if opts.verbose:
         print( "writing : "+path )
-    hp.write_map(path, network, coord='C', extra_header=horizons+[('gps', gps)])
+    hp.write_map(path, network, coord='C', extra_header=horizons+[('gps', int(round(gps, 0)))]) ### round gps time to the nearest second
+                                                                                                ### required for FITS headers
 
     gzpath = utils.sensitivity_path(opts.output_dir, opts.tag, gps, gzip=True)
     if opts.verbose:
