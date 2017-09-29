@@ -75,6 +75,9 @@ parser.add_option('', '--nside', default=512, type='int',
 parser.add_option('', '--compute-exposure', default=False, action='store_true',
     help='add compute_exposure jobs to the DAG to stack everything together')
 
+parser.add_option('', '--do-no-normalize', default=False, action='store_true',
+    help='do not normalize total exposure so it sums to 1')
+
 ### options for condor
 parser.add_option('', '--universe', default='vanilla', type='string',
     help='DEFAULT=vanilla')
@@ -185,7 +188,6 @@ for ifo, channel, frametype in opts.ifo_specs:
         'frametype' : frametype,
         'accounting_group' : opts.accounting_group,
         'accounting_group_user' : opts.accounting_group_user,
-        'outdir' : opts.output_dir,
         'tag' :  subtag,
         'filetag' : filetag,
         'start' : gpsstart,
@@ -226,6 +228,8 @@ for ifo, channel, frametype in opts.ifo_specs:
             s += opts.win
 
         while s < segstop:
+            outdir = utils.gps2dir(opts.output_dir, s, opts.win)
+
             ### add the PSD generation
             dag.write(utils.compute_psd_dag%{\
                 'jobid' : '%s-%d'%(ifo, s),
@@ -233,8 +237,9 @@ for ifo, channel, frametype in opts.ifo_specs:
                 'gpsstart' : s,
                 'gpsstop' : s+opts.win,
                 'retry' : opts.retry,
+                'outdir' : outdir,
             })
-            psd_path = utils.psd_path(opts.output_dir, '%s%s'%(filetag, ifo), s, opts.win) ### should produce this path
+            psd_path = utils.psd_path(outdir, '%s%s'%(filetag, ifo), s, opts.win) ### should produce this path
 
             ### add the horizon computation
             dag.write(utils.compute_horizon_dag%{\
@@ -243,8 +248,9 @@ for ifo, channel, frametype in opts.ifo_specs:
                 'path' : psd_path,
                 'tag' : subtag,
                 'retry' : opts.retry,
+                'outdir' : outdir,
             })
-            horizon_path = utils.horizon_path(opts.output_dir, '%s%s'%(filetag, ifo), s, opts.win) ### should produce this path
+            horizon_path = utils.horizon_path(outdir, '%s%s'%(filetag, ifo), s, opts.win) ### should produce this path
 
             ### add parent child relationships
             psd_jobid = 'compute_psd_%s-%d'%(ifo, s) ### FIXME: hard-coded jobid may be fragile...
@@ -273,12 +279,12 @@ sen_sub.write(utils.compute_network_sensitivity_sub%{\
     'accounting_group' : opts.accounting_group,
     'accounting_group_user' : opts.accounting_group_user,
     'nside' : opts.nside,
-    'outdir' : opts.output_dir,
     'filetag' : filetag,
 })
 sen_sub.close()
 
 for s, ifos in time_periods.items():
+    outdir = utils.gps2dir(opts.output_dir, s, opts.win)
     gps = s + 0.5*opts.win ### take the center of the window, which should be good enough...
     dag.write(utils.compute_network_sensitivity_dag%{\
         'jobid' : '%d'%s,
@@ -287,6 +293,7 @@ for s, ifos in time_periods.items():
         'tag' : opts.tag,
         'ifo_horizons' : '--ifo-horizon '+' --ifo-horizon '.join('%s %s'%(ifo, paths['horizon']) for ifo, paths in ifos.items()),
         'retry' : opts.retry,
+        'outdir': outdir,
     })
 
     sen_jobid = 'compute_network_sensitivity_%d'%s
@@ -296,7 +303,7 @@ for s, ifos in time_periods.items():
     if opts.compute_exposure: ### record jobid for future reference
         time_periods[s].update({\
             'sen_jobid' : sen_jobid,
-            'sen_path' : utils.sensitivity_path(opts.output_dir, filetag, gps, gzip=True),
+            'sen_path' : utils.sensitivity_path(outdir, filetag, gps, gzip=True),
         })
 
 ### add compute_exposure job
@@ -324,6 +331,7 @@ if opts.compute_exposure:
         'jobid' : 'EVERYTHING',
         'sub' : exp_subname,
         'FITS' : ' '.join(_['sen_path'] for _ in time_periods.values()),
+        'normalize' : '--do-not-normalize' if opts.do_not_normalize else '',
         'retry' : opts.retry,
     })
     exp_jobid = 'compute_exposure_EVERYTHING'

@@ -118,7 +118,6 @@ f.write(utils.compute_psd_sub%{\
     'frametype' : frametype,
     'accounting_group' : opts.accounting_group,
     'accounting_group_user' : opts.accounting_group_user,
-    'outdir' : opts.output_dir,
     'tag' :  "--tag "+opts.tag if opts.tag else '',
     'filetag' : filetag,
     'start' : gpsstart,
@@ -151,6 +150,7 @@ for segstart, segstop in segments:
             'gpsstart' : s, 
             'gpsstop' : s+opts.win,
             'retry' : opts.retry,
+            'outdir' : opts.output_dir,
         })
         s += opts.win
 

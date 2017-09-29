@@ -72,7 +72,6 @@ f.write(utils.compute_horizon_sub%{\
     'exe' : opts.exe,
     'accounting_group' : opts.accounting_group,
     'accounting_group_user' : opts.accounting_group_user,
-    'outdir' : opts.output_dir,
     'filetag' : filetag,
     'flow' : opts.flow,
     'fhigh' : opts.fhigh,
@@ -95,6 +94,7 @@ for path in args:
         'path' : path,
         'tag' : tag+opts.tag,
         'retry' : opts.retry,
+        'outdir' : opts.output_dir,
     })
 f.close()
 

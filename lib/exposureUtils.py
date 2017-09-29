@@ -14,57 +14,57 @@ import subprocess as sp
 compute_horizon_sub = '''\
 universe = %(universe)s
 executable = %(exe)s
-arguments = "$(path) --output-dir %(outdir)s $(tag) --flow %(flow)d --fhigh %(fhigh)d --distance %(distance)f --snr-thr %(snr_thr)f -v"
+arguments = "$(path) --output-dir $(outdir) $(tag) --flow %(flow)d --fhigh %(fhigh)d --distance %(distance)f --snr-thr %(snr_thr)f -v"
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
-log    = %(outdir)s/condor-compute_horizon%(filetag)s_$(Cluster)-$(Process).log
-error  = %(outdir)s/condor-compute_horizon%(filetag)s_$(Cluster)-$(Process).err 
-output = %(outdir)s/condor-compute_horizon%(filetag)s_$(Cluster)-$(Process).out
+log    = $(outdir)/condor-compute_horizon%(filetag)s_$(Cluster)-$(Process).log
+error  = $(outdir)/condor-compute_horizon%(filetag)s_$(Cluster)-$(Process).err 
+output = $(outdir)/condor-compute_horizon%(filetag)s_$(Cluster)-$(Process).out
 notification = never
 queue 1'''
 
 compute_horizon_dag = '''\
 JOB    compute_horizon_%(jobid)s %(sub)s
-VARS   compute_horizon_%(jobid)s path="%(path)s" tag="%(tag)s"
+VARS   compute_horizon_%(jobid)s path="%(path)s" tag="%(tag)s" outdir="%(outdir)s"
 RETRY  compute_horizon_%(jobid)s %(retry)d
 '''
 
 compute_network_sensitivity_sub = '''\
 universe = %(universe)s
 executable = %(exe)s
-arguments = "$(gps) $(ifo_horizons) --nside %(nside)d --output-dir %(outdir)s --tag $(tag) -V"
+arguments = "$(gps) $(ifo_horizons) --nside %(nside)d --output-dir $(outdir) --tag $(tag) -V"
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
-log    = %(outdir)s/condor-compute_network_sensitivity%(filetag)s_$(Cluster)-$(Process).log
-error  = %(outdir)s/condor-compute_network_sensitivity%(filetag)s_$(Cluster)-$(Process).err 
-output = %(outdir)s/condor-compute_network_sensitivity%(filetag)s_$(Cluster)-$(Process).out
+log    = $(outdir)/condor-compute_network_sensitivity%(filetag)s_$(Cluster)-$(Process).log
+error  = $(outdir)/condor-compute_network_sensitivity%(filetag)s_$(Cluster)-$(Process).err 
+output = $(outdir)/condor-compute_network_sensitivity%(filetag)s_$(Cluster)-$(Process).out
 notification = never
 queue 1'''
 
 compute_network_sensitivity_dag = '''\
 JOB    compute_network_sensitivity_%(jobid)s %(sub)s
-VARS   compute_network_sensitivity_%(jobid)s gps="%(gps)d" tag="%(tag)s" ifo_horizons="%(ifo_horizons)s"
+VARS   compute_network_sensitivity_%(jobid)s gps="%(gps)d" tag="%(tag)s" outdir="%(outdir)s" ifo_horizons="%(ifo_horizons)s"
 RETRY  compute_network_sensitivity_%(jobid)s %(retry)d
 '''
 
 compute_psd_sub = '''\
 universe = %(universe)s
 executable = %(exe)s
-arguments = "%(channel)s %(frametype)s $(gpsstart) $(gpsstop) --seglen %(seglen)d --overlap %(overlap)d --tukey-alpha %(tukey_alpha)f --output-dir %(outdir)s %(tag)s -V"
+arguments = "%(channel)s %(frametype)s $(gpsstart) $(gpsstop) --seglen %(seglen)d --overlap %(overlap)d --tukey-alpha %(tukey_alpha)f --output-dir $(outdir) %(tag)s -V"
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
-log    = %(outdir)s/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).log
-error  = %(outdir)s/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).err 
-output = %(outdir)s/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).out
+log    = $(outdir)/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).log
+error  = $(outdir)/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).err 
+output = $(outdir)/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).out
 notification = never
 queue 1'''
 
 compute_psd_dag = '''\
 JOB    compute_psd_%(jobid)s %(sub)s
-VARS   compute_psd_%(jobid)s gpsstart="%(gpsstart)d" gpsstop="%(gpsstop)d"
+VARS   compute_psd_%(jobid)s gpsstart="%(gpsstart)d" gpsstop="%(gpsstop)d" outdir="%(outdir)s"
 RETRY  compute_psd_%(jobid)s %(retry)d
 '''
 
@@ -90,7 +90,7 @@ RETRY  plot_psd_%(jobid)s %(retry)d
 compute_exposure_sub = '''\
 universe = %(universe)s
 executable = %(exe)s
-arguments = "$(FITS) --nside %(nside)d --output-dir %(outdir)s %(tag)s"
+arguments = "$(FITS) $(normalize) --nside %(nside)d --output-dir %(outdir)s %(tag)s"
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
@@ -102,7 +102,7 @@ queue 1'''
 
 compute_exposure_dag = '''\
 JOB    compute_exposure_%(jobid)s %(sub)s
-VARS   compute_exposure_%(jobid)s FITS="%(FITS)s"
+VARS   compute_exposure_%(jobid)s FITS="%(FITS)s" normalize="%(normalize)s"
 RETRY  compute_exposure_%(jobid)s %(retry)d
 '''
 
@@ -122,6 +122,9 @@ def sensitivity_path(output_dir, tag, gps, gzip=False):
     if gzip:
         ans = ans+".gz"
     return ans
+
+def gp2dir(directory, start, dur):
+    return "%s/%d/%d-%d/"%(directory, start%100000, start, dur)
 
 #-------------------------------------------------
 

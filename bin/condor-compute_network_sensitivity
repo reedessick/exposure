@@ -83,7 +83,6 @@ f.write(utils.compute_network_sensitivity_sub%{\
     'accounting_group' : opts.accounting_group,
     'accounting_group_user' : opts.accounting_group_user,
     'nside' : opts.nside,
-    'outdir' : opts.output_dir,
     'filetag' : filetag,
 })
 f.close()
@@ -102,6 +101,7 @@ for (start, dur), ifos in gpstimes.items():
         'tag' : opts.tag+'-%d-%d'%(start, dur),
         'ifo_horizons' : '--ifo-horizon '+' --ifo-horizon '.join('%s %s'%tuple(pair) for pair in ifos.items()),
         'retry' : opts.retry,
+        'outdir' : opts.output_dir,
     })
 f.close()
 
