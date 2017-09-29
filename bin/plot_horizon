@@ -1,0 +1,43 @@
+#!/usr/bin/python
+
+__usage__ = "plot_horizon [--options] ifo,horizon.txt.gz ifo,horizon.txt.gz ..."
+__description__ "make some basic plots (like histograms) of the computed horizons"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import os
+
+import matplotlib
+matplotlib.use("Agg")
+from matplotlib import pyplot as plt
+plt.rcParams['text.usetex'] = True
+
+from collections import defaultdict
+
+from optparse import OptionParser
+
+#-------------------------------------------------
+
+parser = OptionParser(usage=__usage__, description=__description__)
+
+parser.add_option('-v', '--verbose', default=False, action='store_true')
+
+parser.add_option('-o', '--output-dir', default='.', type='string')
+parser.add_option('-t', '--tag', default='', type='string')
+
+opts, args = parser.parse_args()
+assert len(args), 'please supply at least one input argument\n%s'%__usage__
+
+if not os.path.exists(opts.output_dir):
+    os.makedirs(opts.output_dir)
+
+if opts.tag:
+    opts.tag = "_"+opts.tag
+
+#-------------------------------------------------
+
+raise NotImplementedError, '''\
+read in horizons from disk and make histograms and/or other basic plots.
+Perhaps a corner plot showing correlations between horizons from each IFO
+'''    
