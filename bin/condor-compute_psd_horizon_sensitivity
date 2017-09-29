@@ -170,7 +170,7 @@ for ifo, channel, frametype in opts.ifo_specs:
     segments = utils.exclude_flags(segments, exclude_flag[ifo], optDict, verbose=opts.verbose)
 
     ### check to make sure we have livetime left, etc
-    assert len(segments), 'no remaining livetime after filtering by flags!'
+    assert segments, 'no remaining livetime after filtering by flags!'
 
     #--------------------
 

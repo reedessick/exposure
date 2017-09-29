@@ -128,28 +128,30 @@ def gps2dir(directory, start, dur):
 
 #-------------------------------------------------
 
+def query_flag(flag, optDict, verbose=False):
+    optDict['flag'] = flag
+    cmd = query_cmd%optDict
+    if verbose:
+        print( cmd )
+    segs = sp.Popen(cmd.split(), stdout=sp.PIPE).communicate()[0]
+    return [[int(_) for _ in seg.split(',')] for seg in sp.Popen(print_cmd, stdin=sp.PIPE, stdout=sp.PIPE).communicate(segs)[0].strip('\n').split('\n') if seg]
+
+
 def include_flags(segments, flags, optDict, verbose=False):
     for flag in flags:
-        optDict['flag'] = flag
-        cmd = query_cmd%optDict
-        if verbose:
-            print( cmd )
-        segs = sp.Popen(cmd.split(), stdout=sp.PIPE).communicate()[0]
-        segs = [[int(_) for _ in seg.split(',')] for seg in sp.Popen(print_cmd, stdin=sp.PIPE, stdout=sp.PIPE).communicate(segs)[0].strip('\n').split('\n')]
+        segments = andsegments(segments, query_flag(flag, optDict, verbose=verbose))
 
-        segments = andsegments(segments, segs)
     return segments
 
 def exclude_flags(segments, flags, optDict, verbose=False):
-    for flag in flags:
-        optDict['flag'] = flag
-        cmd = query_cmd%optDict
-        if verbose:
-            print( cmd )
-        segs = sp.Popen(cmd.split(), stdout=sp.PIPE).communicate()[0]
-        segs = [[int(_) for _ in seg.split(',')] for seg in sp.Popen(print_cmd, stdin=sp.PIPE, stdout=sp.PIPE).communicate(segs)[0].strip('\n').split('\n')]
+    if not segments:
+        return segments
 
-        segments = utils.andsegments(segments, utils.invsegments(gpsstart, gpsstop, segs))
+    gpsstart = segments[0][0]
+    gpsstop = segments[-1][1]
+    for flag in flags:
+        segments = andsegments(segments, invsegments(gpsstart, gpsstop, query_flag(flag, optDict, verbose=verbose)))
+
     return segments
 
 #-------------------------------------------------
@@ -200,6 +202,9 @@ def invsegments(start, stop, segs):
     takes the inverse of a list of segments between start and stop
     assumes that all segments are already between start and stop
     """
+    if not segs:
+        return [[start, stop]]
+
     newsegments = []
     for s, e in segs:
         if start < s <= stop:
