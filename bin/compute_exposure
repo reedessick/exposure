@@ -47,7 +47,7 @@ exposure = np.zeros((hp.nside2npix(opts.nside),), dtype=float)
 for path in args:
     if opts.verbose:
         print( "reading : "+path )
-    exposure += stats.resample(hp.read_map(path, verbose=False), opts.nside)
+    exposure += stats.resample(hp.read_map(path, verbose=False), opts.nside)**(1.5) ### weight by volume
 
 if not opts.do_not_normalize:
     exposure /= np.sum(exposure)
