@@ -82,6 +82,8 @@ segments = utils.include_flags(segments, opts.include_flag, optDict, verbose=opt
 segments = utils.exclude_flags(segments, opts.exclude_flag, optDict, verbose=opts.verbose)
 
 assert segments, 'no remaining livetime after filtering by flags!'
+assert len(segments)==1, 'more than one segment after filtering by flags!'
+assert segments[0][0]==gpsstart and segments[0][1]==gpsstop, 'segments to not cover entire requested time period!'
 
 #------------------------
 
@@ -95,6 +97,13 @@ for frame in sp.Popen(cmd.split(), stdout=sp.PIPE).communicate()[0].replace('fil
         print( frame )
     s, d = utils.extract_start_dur(frame)
     frames.append( (frame, s, d) )
+
+### insure we have full coverage
+segs = utils.andsegments(segments, [(s,s+d) for _, s, d in frames])
+
+assert segs, 'no frame data found!'
+assert len(segs)==1, 'gap in frame data found!'
+assert segs[0][0]==gpsstart and segs[0][1]==gpsstop, 'frame data does not cover entire requested time period!'
 
 #-------------------------------------------------
 

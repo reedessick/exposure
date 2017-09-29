@@ -143,7 +143,7 @@ for segstart, segstop in segments:
     if s < segstart: ### mostly likely case, but we need to check just in case
         s += opts.win 
 
-    while s < segstop:
+    while s+opts.win < segstop:
         f.write(utils.compute_psd_dag%{\
             'jobid' : '%d'%gpsstart,
             'sub' : subname,

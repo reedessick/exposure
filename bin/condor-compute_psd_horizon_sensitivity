@@ -226,7 +226,7 @@ for ifo, channel, frametype in opts.ifo_specs:
         if s < segstart: ### mostly likely case, but we need to check just in case
             s += opts.win
 
-        while s < segstop:
+        while s+opts.win < segstop:
             outdir = utils.gps2dir(opts.output_dir, s, opts.win)
             if not os.path.exists(outdir):
                 os.makedirs(outdir)
