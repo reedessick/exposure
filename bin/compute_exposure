@@ -21,6 +21,10 @@ parser = OptionParser(usage=__usage__, description=__description__)
 
 parser.add_option('-v', '--verbose', default=False, action='store_true')
 
+parser.add_option('', '--index', default=3., type='int', 
+    help='the power to which we raise each map as it is read in before adding it to the cumulative sum. \
+DEFAULT=3 (volumetric weighting).')
+
 parser.add_option('', '--nside', default=256, type='int',
     help='resample all network.fits.gz to this NSIDE before summing')
 
@@ -47,7 +51,7 @@ exposure = np.zeros((hp.nside2npix(opts.nside),), dtype=float)
 for path in args:
     if opts.verbose:
         print( "reading : "+path )
-    exposure += stats.resample(hp.read_map(path, verbose=False), opts.nside)**3 ### weight by volume
+    exposure += stats.resample(hp.read_map(path, verbose=False), opts.nside)**opts.index ### weight by volume
 
 if not opts.do_not_normalize:
     exposure /= np.sum(exposure)
