@@ -21,6 +21,11 @@ parser = OptionParser(usage=__usage__, description=__description__)
 
 parser.add_option('-v', '--verbose', default=False, action='store_true')
 
+parser.add_option('', '--cache', default=False, type='string',
+    help='supply the path to a single file which lists all the network.fits.gz rather than listing them as input arguments. \
+File will be read and its contents appended to the list of input arguments. \
+DEFAULT=None')
+
 parser.add_option('', '--index', default=3., type='int', 
     help='the power to which we raise each map as it is read in before adding it to the cumulative sum. \
 DEFAULT=3 (volumetric weighting).')
@@ -36,7 +41,14 @@ parser.add_option('-t', '--tag', default='', type='string')
 
 opts, args = parser.parse_args()
 
-assert len(args), 'please supply at least one input argument\n%s'%__usage__
+if opts.cache:
+    if opts.verbose:
+        print( 'reading FITS from cache : '+opts.cache )
+    f = open(opts.cache, 'r')
+    args += [_.strip() for _ in f.readlines()]
+    f.close()
+
+assert len(args), 'please supply at least one input argument or --cache\n%s'%__usage__
 
 if opts.tag:
     opts.tag = "_"+opts.tag

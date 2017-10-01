@@ -284,6 +284,9 @@ sen_sub.write(utils.compute_network_sensitivity_sub%{\
 })
 sen_sub.close()
 
+if opts.compute_exposure: ### needed for book-keeping for how we structure the compute-exposure jobs
+    long_periods = defaultdict( list )
+
 for s, ifos in time_periods.items():
     outdir = utils.gps2dir(opts.output_dir, s, opts.win) ### should already exist!
     gps = s + 0.5*opts.win ### take the center of the window, which should be good enough...
@@ -302,7 +305,7 @@ for s, ifos in time_periods.items():
         dag.write('PARENT %s CHILD %s\n'%(paths['horizon_jobid'], sen_jobid))
 
     if opts.compute_exposure: ### record jobid for future reference
-        time_periods[s].update({\
+        long_periods[s/100000].append({\
             'sen_jobid' : sen_jobid,
             'sen_path' : utils.sensitivity_path(outdir, filetag, gps, gzip=True),
         })
@@ -310,7 +313,55 @@ for s, ifos in time_periods.items():
 ### add compute_exposure job
 if opts.compute_exposure:
 
-    ### write sub file
+    exposures = [] ### list of all the smaller exposure jobs we gobble together
+    for smod, paths in long_periods.items():
+        ### write sub file
+        outdir = os.path.join(opts.output_dir, '%d'%smod)
+        exp_cachename = "%s/compute_exposure-%d.cache"%(outdir, smod)
+        exp_subname = "%s/compute_exposure%s-%d.sub"%(opts.output_dir, filetag, smod)
+        if opts.verbose:
+            print( "writing : "+exp_subname )
+        exp_sub = open(exp_subname, 'w')
+        exp_sub.write(utils.compute_exposure_sub%{\
+            'universe' : opts.universe,
+            'exe' : opts.exposure_exe,
+            'accounting_group' : opts.accounting_group,
+            'accounting_group_user' : opts.accounting_group_user,
+            'nside' : opts.nside,
+            'index' : 3, ### weight by volume here
+            'outdir' : outdir,
+            'tag' : "--tag %d"%smod, 
+            'filetag' : filetag,
+        })
+        exp_sub.close()
+
+        ### add job to dag
+        dag.write(utils.compute_exposure_dag%{\
+            'jobid' : '%d'%smod,
+            'sub' : exp_subname,
+            'FITS' : '--cache '+exp_cachename,
+            'normalize' : '--do-not-normalize',
+            'retry' : opts.retry,
+        })
+        exp_jobid = 'compute_exposure_%d'%smod
+        exp_path = '%s/exposure_%d.fits.gz'%(outdir, smod)
+
+        ### add parent/child
+        if opts.verbose:
+            print( 'writing : '+exp_cachename )
+        exp_cache = open(exp_cachename, 'w')
+        for val in paths:
+            dag.write('PARENT %s CHILD %s\n'%(val['sen_jobid'], exp_jobid))
+            exp_cache.write('%s\n'%val['sen_path'])
+        exp_cache.close()
+
+        exposures.append({\
+            'exp_jobid' : exp_jobid, 
+            'exp_path' : exp_path,
+        })
+
+    ### add in final exposure job
+    exp_cachename = "%s/compute_exposure%s.cache"%(opts.output_dir, filetag)
     exp_subname = "%s/compute_exposure%s.sub"%(opts.output_dir, filetag)
     if opts.verbose:
         print( "writing : "+exp_subname )
@@ -321,6 +372,7 @@ if opts.compute_exposure:
         'accounting_group' : opts.accounting_group,
         'accounting_group_user' : opts.accounting_group_user,
         'nside' : opts.nside,
+        'index' : 1, ### already weighted by volume, so just sum them here
         'outdir' : opts.output_dir,
         'tag' : '--tag '+opts.tag if opts.tag else '', 
         'filetag' : filetag,
@@ -331,15 +383,21 @@ if opts.compute_exposure:
     dag.write(utils.compute_exposure_dag%{\
         'jobid' : 'EVERYTHING',
         'sub' : exp_subname,
-        'FITS' : ' '.join(_['sen_path'] for _ in time_periods.values()),
+#        'FITS' : ' '.join(_['exp_path'] for _ in exposures),
+        'FITS' : '--cache '+exp_cachename,
         'normalize' : '--do-not-normalize' if opts.do_not_normalize else '',
         'retry' : opts.retry,
     })
     exp_jobid = 'compute_exposure_EVERYTHING'
 
     ### add parent/child
-    for val in time_periods.values():
-        dag.write('PARENT %s CHILD %s\n'%(val['sen_jobid'], exp_jobid))
+    if opts.verbose:
+        print( 'writing : '+exp_cachename )
+    exp_cache = open(exp_cachename, 'w')
+    for val in exposures:
+        dag.write('PARENT %s CHILD %s\n'%(val['exp_jobid'], exp_jobid))
+        exp_cache.write('%s\n'%val['exp_path'])
+    exp_cache.close()
 
 ### done with the DAG
 dag.close()

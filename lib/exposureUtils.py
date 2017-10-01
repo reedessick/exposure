@@ -90,7 +90,7 @@ RETRY  plot_psd_%(jobid)s %(retry)d
 compute_exposure_sub = '''\
 universe = %(universe)s
 executable = %(exe)s
-arguments = "$(FITS) $(normalize) --nside %(nside)d --output-dir %(outdir)s %(tag)s"
+arguments = "$(FITS) $(normalize) --nside %(nside)d --index %(index)d --output-dir %(outdir)s %(tag)s"
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
