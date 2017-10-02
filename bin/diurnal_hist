@@ -8,6 +8,13 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 
 import os
 
+import numpy as np
+
+import matplotlib
+matplotlib.use("Agg")
+from matplotlib import pyplot as plt
+plt.rcParams['text.usetex'] = True
+
 import exposureUtils as utils
 from lal.gpstime import tconvert
 
@@ -27,7 +34,7 @@ parser.add_option("", "--exclude-flag", default=[], type='string', action='appen
     help='the same as --include-flag, except we only retain times that are \
 outside of these flags instead of inside them')
 
-parser.add_option('', '--reference-gps', default=tconvert('Sep 12 2015 00:00:00'), type='float',
+parser.add_option('', '--reference-gps', default=float(tconvert('Sep 12 2015 00:00:00')), type='float',
     help='DEFAULT=tconvert("Sep 12 2015 00:00:00 UTC"). Should be specified as a float.')
 
 parser.add_option('', '--period', default=86400, type='float',
@@ -36,6 +43,8 @@ DEFAULT=86400')
 
 parser.add_option('-o', '--output-dir', default='.', type='string')
 parser.add_option('-t', '--tag', default='', type='string')
+
+parser.add_option("", '--figtype', default=[], type='string', action='append')
 
 opts, args = parser.parse_args()
 assert len(args)==2, 'please supply exactly 2 input arguments\n%s'%__usage__
@@ -46,6 +55,14 @@ if opts.tag:
 
 if not os.path.exists(opts.output_dir):
     os.makedirs(opts.output_dir)
+
+if not opts.figtype:
+    opts.figtype.append( 'png' )
+
+optDict = {
+    'gpsstart' : gpsstart,
+    'gpsstop'  : gpsstop,
+}
 
 #-------------------------------------------------
 
@@ -59,7 +76,91 @@ assert segments, 'no remaining livetime after filtering by flags!'
 
 #-------------------------------------------------
 
-raise NotImplementedError, '''\
-iterate through segments and wrap them so they all are mapped to within [0, --period) and break segments into multiple new segments as necessary
-then iterate over the new segments and bin the data to compute a stacked estimate.
-'''
+### wrap segments into the relevant range
+if opts.verbose:
+    print( 'wrapping segments' )
+wrapped_segments = []
+lvtm = 0.
+for s, e in segments:
+    lvtm += e-s ### count the total amount of live time
+
+    ### convert to time releative to reference GPS
+    s -= opts.reference_gps
+    e -= opts.reference_gps
+
+    ### in case s < opts.refrence_gps or s >= opts.reference_gps+opts.period
+    ### map start time into the relevant range
+    while s < 0:
+        s += opts.period
+        e += opts.period
+    while s >= opts.period:
+        s -= opts.period
+        e -= opts.period
+
+    while e > opts.period:
+        wrapped_segments.append( [s, opts.period] )
+        e -= opts.period ### subtract out the bins we've already taken into account
+        s = 0 ### re-set the start back to the begining of the wrapped range
+    wrapped_segments.append( [s, e] ) ### add in final bit
+
+### compute counts
+bins = np.linspace(0, opts.period, 1+int(10*(lvtm/opts.period)**0.5)) ### FIXME: could produce poor binning?
+dt = bins[1]-bins[0]
+counts = np.zeros(len(bins)-1, dtype=float)
+
+if opts.verbose:
+    print( 'computing histogram' )
+for s, e in wrapped_segments:
+    i = 0
+    while s > bins[i]:
+        i += 1
+
+    if s < bins[i]: ### a possible hanging segment. FIXME: this logic could be cleaned up...
+        if e <= bins[i]:
+            counts[i-1] += e-s
+            continue
+
+        if e > bins[i]:
+            counts[i-1] += bins[i]-s
+            s = bins[i]
+
+    while e > bins[i+1]: ### pick up the rest of the segment (start is now aligned with bins)
+        counts[i] += dt
+        i += 1
+    counts[i] += e-bins[i]
+
+path = "%s/diurnal_hist%s.txt"%(opts.output_dir, opts.tag)
+if opts.verbose:
+    print( 'writing : '+path )
+f = open(path, 'w')
+print >> f, opts.period
+print >> f, ' '.join('%.9f'%_ for _ in counts)
+f.close()
+
+### generate figure
+if opts.verbose:
+    print( 'plotting' )
+
+fig = plt.figure()
+ax = fig.gca()
+
+counts /= lvtm
+
+color = ax.step([bins[0]]+list(0.5*(bins[1:]+bins[:-1]))+[bins[-1]], [counts[0]]+list(counts)+[counts[-1]], where='mid')[0].get_color()
+for s, e, c in zip(bins[:-1], bins[1:], counts):
+    o = (c*(1-c)/(lvtm/dt))**0.5
+    ax.fill_between([s,e], [c+o]*2, [c-o]*2, alpha=0.25, edgecolor='none')
+
+ax.grid(True, which='both')
+
+ax.set_xlabel('(t-%.3f)%s%.3f'%(opts.reference_gps, "\%", opts.period))
+ax.set_ylabel('fraction of time')
+
+ax.set_xlim(xmin=0, xmax=opts.period)
+
+for figtype in opts.figtype:
+    figname = "%s/diurnal_hist%s.%s"%(opts.output_dir, opts.tag, figtype)
+    if opts.verbose:
+        print( figname )
+    fig.savefig(figname)
+plt.close(fig)
