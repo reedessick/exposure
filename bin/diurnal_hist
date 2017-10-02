@@ -7,6 +7,7 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 #-------------------------------------------------
 
 import os
+import gzip
 
 import numpy as np
 
@@ -129,10 +130,10 @@ for s, e in wrapped_segments:
         i += 1
     counts[i] += e-bins[i]
 
-path = "%s/diurnal_hist%s.txt"%(opts.output_dir, opts.tag)
+path = "%s/diurnal_hist%s.txt.gz"%(opts.output_dir, opts.tag)
 if opts.verbose:
     print( 'writing : '+path )
-f = open(path, 'w')
+f = gzip.open(path, 'w')
 print >> f, opts.period
 print >> f, ' '.join('%.9f'%_ for _ in counts)
 f.close()

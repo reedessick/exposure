@@ -7,11 +7,30 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 #-------------------------------------------------
 
 import os
+import gzip
 
+import numpy as np
 import exposureUtils as utils
 import dft
 
+import matplotlib
+matplotlib.use("Agg")
+from matplotlib import pyplot as plt
+plt.rcParams['text.usetex'] = True
+
 from optparse import OptionParser
+
+#-------------------------------------------------
+
+unitDict = {
+    'second' : 1.,
+    'month' : 60.,
+    'hour' : 3600.,
+    'day' : 86400.,
+    'week' : 7*86400.,
+    'month' : 31*86400.,
+    'year' : 86400*365,
+}
 
 #-------------------------------------------------
 
@@ -27,9 +46,24 @@ parser.add_option("", "--exclude-flag", default=[], type='string', action='appen
     help='the same as --include-flag, except we only retain times that are \
 outside of these flags instead of inside them')
 
+parser.add_option('', '--srate', default=1, type='float',
+    help='sample rate used to discretize segments into time-series for DFT. \
+DEFAULT=1')
+parser.add_option('', '--tukey-alpha', default=0.0, type='float',
+    help='the tukey alpha value used to window segments. \
+DEFAULT=0.0')
+
+parser.add_option('', '--time-unit', default='second', type='string',
+    help='the time unit used for plotting. Can be one of %s. \
+DEFAULT=second.'%(', '.join(unitDict.keys())))
+
+parser.add_option('', '--f-max', default=None, type='float',
+    help='used for plotting. specified in units corresponding to --time-unit')
 
 parser.add_option('-o', '--output-dir', default='.', type='string')
 parser.add_option('-t', '--tag', default='', type='string')
+
+parser.add_option('', '--figtype', default=[], type='string', action='append')
 
 opts, args = parser.parse_args()
 assert len(args)==2, 'please supply exactly 2 input arguments\n%s'%__usage__
@@ -40,6 +74,14 @@ if opts.tag:
 
 if not os.path.exists(opts.output_dir):
     os.makedirs(opts.output_dir)
+
+if not opts.figtype:
+    opts.figtype.append( 'png' )
+
+optDict = {
+    'gpsstart' : gpsstart,
+    'gpsstop'  : gpsstop,
+}
 
 #-------------------------------------------------
 
@@ -53,7 +95,63 @@ assert segments, 'no remaining livetime after filtering by flags!'
 
 #-------------------------------------------------
 
-raise NotImplementedError, '''\
-need to take a DFT of segments. 
-Perhaps hit each segment with a tukey window? pick up alpha from the command line"
-'''
+if opts.verbose:
+    print( "creating time-series" )
+
+dt = 1./opts.srate
+times = np.arange(gpsstart, gpsstop, dt) ### FIXME: warning! this could be a BIG array...
+active = np.zeros_like(times, dtype=float)
+
+for s, e in segments:
+    truth = (s <= times)*(times <= e)
+
+    if opts.tukey_alpha!=0:
+        raise NotImplementedError, "i'm not sure what it would mean for alpha!=0 with variable length segments..."
+    else:
+        window = np.ones(np.sum(truth), dtype=float)
+        
+    active[truth] = window
+    
+#--- take DFT
+
+if opts.verbose:
+    print( "taking DFT" )
+
+factive, freqs = dft.dft(active, dt=dt) ### FIXME: could also be expensive...this whole thing could be expensive...
+
+path = '%s/diurnal_dft%s-%d-%d.txt.gz'%(opts.output_dir, opts.tag, gpsstart, gpsstop-gpsstart)
+if opts.verbose:
+    print( 'writing : '+path )
+f = gzip.open(path, 'w')
+for a, b in zip(freqs, factive):
+    f.write('%.9f %.9f+%.9fj\n'%(a, b.real, b.imag))
+f.close()
+
+#--- plot the spectrum!
+
+if opts.verbose:
+    print( "plotting" )
+
+fig = plt.figure()
+ax = fig.gca()
+
+truth = freqs > 0 ### don't plot the DC component
+
+#ax.plot(freqs[truth]*unitDict[opts.time_unit], np.log10(np.abs(factive[truth])/unitDict[opts.time_unit]) )
+#ax.set_ylabel(r'$\log_{10}\left|\mathrm{DFT(segments)}\right|$ [%s]'%opts.time_unit)
+ax.plot(freqs[truth]*unitDict[opts.time_unit], np.abs(factive[truth])/unitDict[opts.time_unit] )
+ax.set_ylabel(r'$\left|\mathrm{DFT(segments)}\right|$ [%s]'%opts.time_unit)
+
+ax.grid(True, which='both')
+
+ax.set_xlabel('$f$ [1/%s]'%opts.time_unit)
+
+if opts.f_max!=None:
+    ax.set_xlim(xmax=opts.f_max)
+
+for figtype in opts.figtype:
+    figname = "%s/diurnal_dft%s.%s"%(opts.output_dir, opts.tag, figtype)
+    if opts.verbose:
+        print( figname )
+    fig.savefig(figname)
+plt.close(fig)
