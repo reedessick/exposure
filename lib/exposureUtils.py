@@ -106,6 +106,25 @@ VARS   compute_exposure_%(jobid)s FITS="%(FITS)s" normalize="%(normalize)s"
 RETRY  compute_exposure_%(jobid)s %(retry)d
 '''
 
+plot_maps_sub = '''\
+universe = %(universe)s
+executable = %(exe)s
+arguments = "$(base),$(path) --coord %(coord)s --grid --projection %(projection)s $(tag) -v"
+getenv = true
+accounting_group = %(accounting_group)s
+accounting_group_user = %(accounting_group_user)s
+log    = $(outdir)/condor-plot_maps%(filetag)s_$(Cluster)-$(Process).log
+error  = $(outdir)/condor-plot_maps%(filetag)s_$(Cluster)-$(Process).err 
+output = $(outdir)/condor-plot_maps%(filetag)s_$(Cluster)-$(Process).out
+notification = never
+queue 1'''
+
+plot_maps_dag = '''\
+JOB    compute_horizon_%(jobid)s %(sub)s
+VARS   compute_horizon_%(jobid)s path="%(path)s" tag="%(tag)s"
+RETRY  compute_horizon_%(jobid)s %(retry)d
+'''
+
 query_cmd = "ligolw_segment_query_dqsegdb -q -t https://segments.ligo.org -a %(flag)s -s %(gpsstart)d -e %(gpsstop)d"
 print_cmd = "ligolw_print -c start_time -c end_time -t segment".split()
 

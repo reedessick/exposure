@@ -8,6 +8,8 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 
 import os
 
+import getpass
+
 from optparse import OptionParser
 
 #-------------------------------------------------
@@ -16,9 +18,12 @@ parser = OptionParser(usage=__usage__, description=__description__)
 
 parser.add_option("-v", "--verbose", default=False, action="store_true")
 
+parser.add_option('', '--coord', default='C', type='string', 
+    help='the coordinate system. Mostly used to determine projection here')
+
 parser.add_option('', '--universe', default='vanilla', type='string',
     help='DEFAULT=vanilla')
-parser.add_option('', '--exe', default='compute_psd', type='string',
+parser.add_option('', '--exe', default='plot_maps.py', type='string',
     help='specify the explicit path to the executable. \
 DEFAULT=compute_psd')
 
@@ -50,7 +55,47 @@ if not os.path.exists(opts.output_dir):
 
 #-------------------------------------------------
 
-raise NotImplementedError, '''\
-need to write a SUB template and DAG template within exposureUtils
-then basically just iterate through args and define one job for each
-'''
+### write sub file
+subname = "%s/plot_maps%s.sub"%(opts.output_dir, filetag)
+if opts.verbose:
+    print( "writing : "+subname )
+f = open(subname, 'w')
+f.write(utils.plot_maps_sub%{\
+    'universe' : opts.universe,
+    'exe' : opts.exe,
+    'accounting_group' : opts.accounting_group,
+    'accounting_group_user' : opts.accounting_group_user,
+    'filetag' : filetag,
+    'coord' : opts.coord,
+    'projection' : 'astro mollweide' if opts.coord=='C' else 'mollweide',
+})
+f.close()
+
+### iterate over segments and define compute_psd jobs for each
+dagname = subname.replace('.sub', '.dag')
+if opts.verbose:
+    print( "writing : "+dagname )
+f = open(dagname, 'w')
+
+for path in args:
+    f.write(utils.compute_horizon_dag%{\
+        'sub' : subname,
+        'jobid' : opts.tag,
+        'base' : os.path.basename(path).strip('.gz').strip('.fits'),
+        'path' : path,
+        'tag' : tag+opts.tag,
+        'retry' : opts.retry,
+    })
+f.close()
+
+#-------------------------------------------------
+
+### submit
+if opts.condor_submit:
+    if opts.verbose:
+        print( 'submitting : '+dagname )
+    import subprocess as sp
+    sp.Popen(['condor_submit_dag', dagname]).wait()
+
+elif opts.verbose:
+    print( 'you can now submit : '+dagname )
