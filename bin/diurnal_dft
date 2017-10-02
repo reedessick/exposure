@@ -8,6 +8,9 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 
 import os
 
+import exposureUtils as utils
+import dft
+
 from optparse import OptionParser
 
 #-------------------------------------------------
@@ -16,10 +19,21 @@ parser = OptionParser(usage=__usage__, description=__description__)
 
 parser.add_option('-v', '--verbose', default=False, action='store_true')
 
+parser.add_option("", "--include-flag", default=[], type='string', action='append',
+    help='the flags used to select subsets of [gpsstart, gpsstop] for analysis. \
+Can be repeated to take the intersection of multiple flags. \
+DEFAULT=[] (analyze all time in [gpsstart, gpsstop]).')
+parser.add_option("", "--exclude-flag", default=[], type='string', action='append',
+    help='the same as --include-flag, except we only retain times that are \
+outside of these flags instead of inside them')
+
+
 parser.add_option('-o', '--output-dir', default='.', type='string')
 parser.add_option('-t', '--tag', default='', type='string')
 
 opts, args = parser.parse_args()
+assert len(args)==2, 'please supply exactly 2 input arguments\n%s'%__usage__
+gpsstart, gpsstop = [float(_) for _ in args]
 
 if opts.tag:
     opts.tag = "_"+opts.tag
@@ -29,4 +43,17 @@ if not os.path.exists(opts.output_dir):
 
 #-------------------------------------------------
 
-raise NotImplementedError
+### go find segment data
+segments = [[gpsstart, gpsstop]]
+
+segments = utils.include_flags(segments, opts.include_flag, optDict, verbose=opts.verbose)
+segments = utils.exclude_flags(segments, opts.exclude_flag, optDict, verbose=opts.verbose)
+
+assert segments, 'no remaining livetime after filtering by flags!'
+
+#-------------------------------------------------
+
+raise NotImplementedError, '''\
+need to take a DFT of segments. 
+Perhaps hit each segment with a tukey window? pick up alpha from the command line"
+'''
