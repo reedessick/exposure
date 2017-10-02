@@ -1,17 +1,25 @@
 #!/usr/bin/python
 
 __usage__ = "plot_horizon [--options] ifo,horizon.txt.gz ifo,horizon.txt.gz ..."
-__description__ "make some basic plots (like histograms) of the computed horizons"
+__description__ = "make some basic plots (like histograms) of the computed horizons"
 __author__ = "Reed Essick (reed.essick@ligo.org)"
 
 #-------------------------------------------------
 
 import os
 
+import gzip
+
+import numpy as np
+
 import matplotlib
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt
 plt.rcParams['text.usetex'] = True
+
+import corner #### FIXME: do I really want this dependency?
+
+import exposureUtils as utils
 
 from collections import defaultdict
 
@@ -26,6 +34,8 @@ parser.add_option('-v', '--verbose', default=False, action='store_true')
 parser.add_option('-o', '--output-dir', default='.', type='string')
 parser.add_option('-t', '--tag', default='', type='string')
 
+parser.add_option('', '--figtype', default=[], type='string', action='append')
+
 opts, args = parser.parse_args()
 assert len(args), 'please supply at least one input argument\n%s'%__usage__
 
@@ -35,9 +45,68 @@ if not os.path.exists(opts.output_dir):
 if opts.tag:
     opts.tag = "_"+opts.tag
 
+if not opts.figtype:
+    opts.figtype.append( 'png' )
+
 #-------------------------------------------------
 
-raise NotImplementedError, '''\
-read in horizons from disk and make histograms and/or other basic plots.
-Perhaps a corner plot showing correlations between horizons from each IFO
-'''    
+### read data
+
+ifos = defaultdict( list )
+times = defaultdict( dict )
+
+for ifo, path in [arg.split(',') for arg in args]:
+    if opts.verbose:
+        print( '%s -> %s'%(ifo, path) )
+    f = gzip.open(path, 'r')
+    horizon = float(f.readline().strip())
+    f.close()
+
+    ifos[ifo].append( horizon )
+    times[utils.extract_start_dur(path, suffix='.txt.gz')[0]].update( {'ifo':horizon} )
+
+#-------------------------------------------------
+
+### plot histograms of horizons on an individual IFO basis
+if opts.verbose:
+    print( "plotting single-IFO stacked histogram" )
+fig = plt.figure()
+ax = fig.gca()
+for ifo, horizons in ifos.items():
+    ax.hist(horizons, bins=int(len(horizons)**0.5), histtype='step', label=ifo, weights=np.ones_like(horizons, dtype=float)/len(horizons))
+ax.set_xlabel('horizon [arbitrary units]')
+ax.set_ylabel('fraction of events')
+
+ax.grid(True, which='both')
+ax.legend(loc='best')
+
+for figtype in opts.figtype:
+    figname = "%s/horizons%s.%s"%(opts.output_dir, opts.tag, figtype)
+    if opts.verbose:
+        print( figname )
+    fig.savefig(figname)
+plt.close(fig)
+
+### plot corner plot of all IFO horizons. Fill in missing entries with -np.infty to get them skipped in plotting (use corner.py?)
+
+if opts.verbose:
+    print( "plotting corner plot" )
+
+ifos = ifos.keys() ### don't need the values sorted that way anymore, but do need the keys
+
+data = []
+for val in times.values():
+    data.append( np.array([val.get(ifo, -np.infty) for ifo in ifos]) ) ### fill in missing entries with -np.infty...
+data = np.array(data)
+
+fig = corner.corner(
+    data,
+    labels=ifos,
+)
+
+for figtype in opts.figtype:
+    figname = "%s/horizon-corner%s.%s"%(opts.output_dir, opts.tag, figtype)
+    if opts.verbose:
+        print( figname )
+    fig.savefig(figname)
+plt.close(fig)
