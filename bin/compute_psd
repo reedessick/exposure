@@ -92,7 +92,7 @@ cmd = "gw_data_find -o %(observatory)s --type %(frametype)s --url file -s %(gpss
 if opts.verbose:
     print( cmd )
 frames = []
-for frame in sp.Popen(cmd.split(), stdout=sp.PIPE).communicate()[0].replace('file://localhost','').strip().split('\n'):
+for frame in [frame for frame in sp.Popen(cmd.split(), stdout=sp.PIPE).communicate()[0].replace('file://localhost','').strip().split('\n') if frame]:
     if opts.Verbose:
         print( frame )
     s, d = utils.extract_start_dur(frame)
