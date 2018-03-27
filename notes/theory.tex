@@ -1,0 +1,89 @@
+\documentclass{article}
+
+%-------------------------------------------------
+
+\usepackage{setspace}
+
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+
+%------------------------
+
+%-------------------------------------------------
+\begin{document}
+
+\title{
+Upon constraining the spatial distribution of transient gravitational-wave sources
+}
+
+\author{
+Reed Essick
+}
+
+\maketitle
+
+%------------------------
+
+\doublespace
+
+
+We begin by asserting that graviational waves (GWs) are interesting and therefore their sources are interesting.
+Furthermore, we assert that the spacetime distribution of sources is also interesting and set out to measure that distribution using transient GW signals.
+A bit of nomenclature
+
+\vspace{1cm}
+\begin{tabular}{p{3cm}p{8cm}}
+    $R(\Omega, z, m_1, m_2, ...)$ & the rate of signals from a direction in the sky ($\Omega$) at redshift $z$ with masses $m_1$, $m_2$, etc. \\
+    $dV/d\Omega dt dm_1 dm_2$     & the differntial sensitive volume observed by our detectors as a function of time, position on the sky, masses, etc. which depends on the detector sensitivity
+\end{tabular}
+
+This means that the expected rate of signals with masses $m_1$, $m_2$, etc. coming from $\Omega$ at time $t$ will be something like 
+\begin{equation}
+    \lambda = R(\Omega, m_1, m_2) \frac{dV}{d\Omega dt dm_1 dm_2} \Delta\Omega \Delta t \Delta m_1 \Delta m_2
+\end{equation}
+We therefore expect the probability of observing a signal within a short time window to be
+\begin{equation}
+    p(n=1|R, dV) = RdV e^{-RdV}
+\end{equation}
+which is a function of $t$, $\Omega$, $m_1$, $m_2$, etc.
+Furthermore, we take the probabilyt of observing no signals to be
+\begin{equation}
+    p(n=0|R, dv) = e^{-RdV}
+\end{equation}
+As long as we restrict ourselves to short enough time windows ($RdV/dt \Delta t \ll 1$), we can assume we will see either 0 or 1 events in any particular window and leave it at that.
+
+Now, we construct a joint likelihood of many different time segments, assuming each time segment is independent.
+Formally, we deconstruct this following Messenger+Veitch (2013) into segments for which data was recorded above some detection statistic and segments during which data was not recorded above some detection statistic as follows.
+\begin{align}
+    p(\mathrm{data}|R) = & \prod\limits_{i\in d_i\geq\mathrm{thr}} \int d\theta_i p(\theta_i) \left[ p(d_i|\theta_i, \Omega, \mathrm{signal}) p(n=1|R, dV_i) p(\mathrm{signal}) \right. \nonumber \\
+                         & \quad \quad \quad \quad \quad \quad \left. + p(d_i|\mathrm{noise})p(n=0|R, dV_i) p(\mathrm{noise}) \right ] \nonumber \\
+                         & \times \prod\limits_{j\in d_j<\mathrm{thr}} \int d\theta_j p(\theta_j) \left[ p(d_j<\mathrm{thr}|\theta_j, \Omega, \mathrm{signal})p(n=1|R, dV_j) p(\mathrm{signal}) \right. \nonumber \\
+                         & \quad \quad \quad \quad \quad \quad \left. + p(d_j<\mathrm{thr}|\mathrm{noise})p(n=0|R,dV_j) p(\mathrm{noise}) \right] 
+\end{align}
+
+We then make a few simplifying assumptions based on informed choices of the threshold so that
+\begin{align}
+    p(d<\mathrm{thr}|\mathrm{noise}) & = 1 \\
+    p(d<\mathrm{thr}|\mathrm{signal}) & = 0 
+\end{align}
+which means that we may need to ``renormalize'' the likelihood $p(d|\theta,\Omega,\mathrm{signal})$ appropriately to throw away all $d<\mathrm{thr}$.
+With these assumptions, our marginal likelihood then becomes
+\begin{multline}
+    p(\mathrm{data}|R) \propto \left[ \prod\limits_{i\in d_i\geq\mathrm{thr}} \int d\theta_i \left( p(\theta_i) p(d_i|\theta_i, \Omega) R dV_i \right) e^{-R dV_i} \right] \\
+    \times \left[ \prod\limits_{j\in d_j<\mathrm{thr}} \int d\theta_j p(\theta_j) e^{-RdV_j} \right]
+\end{multline}
+where $dV_i$ is meant as short-hand for the sensitive volume within the associated time window in the associated direction for the associated masses, etc.
+We note that the marginalization over $p(\theta_i) p(d_i|\theta_i, \Omega) dV_i$ essentially gives you the skymap; factors of $dV_i$ here really just apply relative weights to different $\Omega$ based on the antenna patterns, which is already incorporated into our skymaps (weighting around the ring).
+There may be an overall normalization that hangs around, but it will not affect the relative weights assigned to different $\Omega$.
+In this sense, the distribution $R(\Omega)$ can be thought of as a prior on $\Omega$ in the skymap, which is exactly as it should be.
+
+We see that the problem then boils down to knowing two main things
+\begin{enumerate}
+    \item{the likelihood as a function of source location for each event separately, obtainable from existing posterior samples from each event and}
+    \item{measures of the ``exposure'' or $\int Vdt$ as a cumulative sum and as a function of time (we need the differential version for when we observe events).}
+\end{enumerate}
+Once we are able to compute this marginal likelihood at scale, we can perform model selection and all that jazz.
+
+%-------------------------------------------------
+\end{document}
