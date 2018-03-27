@@ -2,6 +2,7 @@
 
 %-------------------------------------------------
 
+\usepackage{fullpage}
 \usepackage{setspace}
 
 \usepackage{amsmath}
@@ -56,10 +57,8 @@ As long as we restrict ourselves to short enough time windows ($RdV/dt \Delta t 
 Now, we construct a joint likelihood of many different time segments, assuming each time segment is independent.
 Formally, we deconstruct this following Messenger+Veitch (2013) into segments for which data was recorded above some detection statistic and segments during which data was not recorded above some detection statistic as follows.
 \begin{align}
-    p(\mathrm{data}|R) = & \prod\limits_{i\in d_i\geq\mathrm{thr}} \int d\theta_i p(\theta_i) \left[ p(d_i|\theta_i, \Omega, \mathrm{signal}) p(n=1|R, dV_i) p(\mathrm{signal}) \right. \nonumber \\
-                         & \quad \quad \quad \quad \quad \quad \left. + p(d_i|\mathrm{noise})p(n=0|R, dV_i) p(\mathrm{noise}) \right ] \nonumber \\
-                         & \times \prod\limits_{j\in d_j<\mathrm{thr}} \int d\theta_j p(\theta_j) \left[ p(d_j<\mathrm{thr}|\theta_j, \Omega, \mathrm{signal})p(n=1|R, dV_j) p(\mathrm{signal}) \right. \nonumber \\
-                         & \quad \quad \quad \quad \quad \quad \left. + p(d_j<\mathrm{thr}|\mathrm{noise})p(n=0|R,dV_j) p(\mathrm{noise}) \right] 
+    p(\mathrm{data}|R) = & \prod\limits_{i\in d_i\geq\mathrm{thr}} \int d\theta_i p(\theta_i) \left[ p(d_i|\theta_i, \Omega, \mathrm{signal}) p(n=1|RdV_i) + p(d_i|\mathrm{noise})p(n=0|RdV_i) \right ] \nonumber \\
+                         & \times \prod\limits_{j\in d_j<\mathrm{thr}} \int d\theta_j p(\theta_j) \left[ p(d_j<\mathrm{thr}|\theta_j, \Omega, \mathrm{signal})p(n=1|RdV_j) + p(d_j<\mathrm{thr}|\mathrm{noise})p(n=0|RdV_j) \right] 
 \end{align}
 
 We then make a few simplifying assumptions based on informed choices of the threshold so that
@@ -69,10 +68,9 @@ We then make a few simplifying assumptions based on informed choices of the thre
 \end{align}
 which means that we may need to ``renormalize'' the likelihood $p(d|\theta,\Omega,\mathrm{signal})$ appropriately to throw away all $d<\mathrm{thr}$.
 With these assumptions, our marginal likelihood then becomes
-\begin{multline}
-    p(\mathrm{data}|R) \propto \left[ \prod\limits_{i\in d_i\geq\mathrm{thr}} \int d\theta_i \left( p(\theta_i) p(d_i|\theta_i, \Omega) R dV_i \right) e^{-R dV_i} \right] \\
-    \times \left[ \prod\limits_{j\in d_j<\mathrm{thr}} \int d\theta_j p(\theta_j) e^{-RdV_j} \right]
-\end{multline}
+\begin{equation}
+    p(\mathrm{data}|R) \propto \left[ \prod\limits_{i\in d_i\geq\mathrm{thr}} \int d\theta_i \left( p(\theta_i) p(d_i|\theta_i, \Omega) dV_i \right) R e^{-R dV_i} \right] \left[ \prod\limits_{j\in d_j<\mathrm{thr}} \int d\theta_j p(\theta_j) e^{-RdV_j} \right]
+\end{equation}
 where $dV_i$ is meant as short-hand for the sensitive volume within the associated time window in the associated direction for the associated masses, etc.
 We note that the marginalization over $p(\theta_i) p(d_i|\theta_i, \Omega) dV_i$ essentially gives you the skymap; factors of $dV_i$ here really just apply relative weights to different $\Omega$ based on the antenna patterns, which is already incorporated into our skymaps (weighting around the ring).
 There may be an overall normalization that hangs around, but it will not affect the relative weights assigned to different $\Omega$.
