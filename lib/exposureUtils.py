@@ -155,7 +155,6 @@ def query_flag(flag, optDict, verbose=False):
     segs = sp.Popen(cmd.split(), stdout=sp.PIPE).communicate()[0]
     return [[int(_) for _ in seg.split(',')] for seg in sp.Popen(print_cmd, stdin=sp.PIPE, stdout=sp.PIPE).communicate(segs)[0].strip('\n').split('\n') if seg]
 
-
 def include_flags(segments, flags, optDict, verbose=False):
     for flag in flags:
         segments = andsegments(segments, query_flag(flag, optDict, verbose=verbose))
