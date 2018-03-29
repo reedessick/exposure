@@ -33,12 +33,16 @@ DEFAULT=[]')
 ### options to figure out what data to pick up
 parser.add_option("", "--include-flag", default=[], nargs=2, type='string', action='append',
     help='the ifo, flag pairs used to select subsets of [gpsstart, gpsstop] for analysis. \
-Can be repeated to take the intersection of multiple flags. \
+Can be repeated to take the intersection of multiple flags, but intersections are taken for each IFO separately. \
 DEFAULT=[] (analyze all time in [gpsstart, gpsstop]).')
 
 parser.add_option("", "--exclude-flag", default=[], nargs=2, type='string', action='append',
     help='the same as --include-flag, except we only retain times that are \
 outside of these flags instead of inside them')
+
+parser.add_option("", "--joint-lock-only", default=False, action='store_true',
+    help="if supplied, only analyze the intersection of all IFOs lock times. \
+Can be used to remove any single-IFO times, etc.")
 
 ### options for how to compute PSD
 parser.add_option("", "--win", default=60, type="int",
@@ -157,28 +161,37 @@ dag = open(dagname, 'w')
 
 #------------------------
 
-### figure out which PSDs will be available when
-if opts.verbose:
-    print( 'setting up PSD generation' )
-
+### figure out segments
+segsdict = dict()
 for ifo, channel, frametype in opts.ifo_specs:
-    segments = [[gpsstart, gpsstop]]
-
     optDict = {
         'gpsstart' : gpsstart,
         'gpsstop'  : gpsstop,
         'observatory' : channel[0],
         'frametype' : frametype,
     }
+    segsdict[ifo] = [[gpsstart, gpsstop]]
+    segsdict[ifo] = utils.include_flags(segsdict[ifo], include_flag[ifo], optDict, verbose=opts.verbose)
+    segsdict[ifo] = utils.exclude_flags(segsdict[ifo], exclude_flag[ifo], optDict, verbose=opts.verbose)
+    
+if opts.joint_lock_only:
+    segments = [[gpsstart, gpsstop]]
+    for ifo, _, _ in opts.ifo_specs:
+        segments = utils.andsegments(segments, segsdict[ifo])
 
-    segments = utils.include_flags(segments, include_flag[ifo], optDict, verbose=opts.verbose)
-    segments = utils.exclude_flags(segments, exclude_flag[ifo], optDict, verbose=opts.verbose)
+    for ifo, _, _ in opts.ifo_specs:
+        segsdict[ifo] = segments
+
+### figure out which PSDs will be available when
+if opts.verbose:
+    print( 'setting up PSD generation' )
+
+for ifo, channel, frametype in opts.ifo_specs:
 
     ### check to make sure we have livetime left, etc
-    assert segments, 'no remaining livetime after filtering by flags!'
-    lvtm = sum([e-s for s, e in segments])
+    assert segsdict[ifo], 'no remaining livetime after filtering by flags!'
 
-    #--------------------
+    #-------
 
     subtag = '--tag '+opts.tag+ifo
 
@@ -224,7 +237,7 @@ for ifo, channel, frametype in opts.ifo_specs:
 
     ### iterate over segments and define compute_psd jobs for each
     covered = 0
-    for segstart, segstop in segments:
+    for segstart, segstop in segsdict[ifo]:
         segdur = segstop - segstart
         if opts.verbose:
             print( "scheduling jobs for %d -- %d"%(segstart, segstop) )
@@ -279,7 +292,7 @@ for ifo, channel, frametype in opts.ifo_specs:
 
     if opts.Verbose: ### report amount of time covered
         print( 'requested       : %d sec'%(gpsstop-gpsstart) )
-        print( 'within segments : %d sec'%lvtm )
+        print( 'within segments : %d sec'%sum([e-s for s, e in segsdict[ifo]]) )
         print( 'covered by PSD  : %d sec'%covered )
 
 ### add network sensitivity jobs
