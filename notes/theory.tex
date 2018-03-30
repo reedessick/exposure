@@ -28,60 +28,77 @@ Reed Essick
 
 \doublespace
 
-
 We begin by asserting that graviational waves (GWs) are interesting and therefore their sources are interesting.
 Furthermore, we assert that the spacetime distribution of sources is also interesting and set out to measure that distribution using transient GW signals.
 A bit of nomenclature
 
-\vspace{1cm}
-\begin{tabular}{p{3cm}p{8cm}}
-    $R(\Omega, z, m_1, m_2, ...)$ & the rate of signals from a direction in the sky ($\Omega$) at redshift $z$ with masses $m_1$, $m_2$, etc. \\
-    $dV/d\Omega dt dm_1 dm_2$     & the differntial sensitive volume observed by our detectors as a function of time, position on the sky, masses, etc. which depends on the detector sensitivity
+\vspace{0.5cm}
+\begin{tabular}{p{3cm}p{12cm}}
+    $R(m_1, m_2, z, \Omega)$ & the rate of signals from a direction in the sky ($\Omega$) at redshift $z$ with masses $m_1$, $m_2$, etc. \\
+    $dV/d\Omega dz$     & the differntial sensitive volume observed by our detectors as a function of time, position on the sky, masses, etc. which depends on the detector sensitivity \\
+    $p(\mathrm{detect}|m_1,m_2,z;t)$ & the probability of detecting a signal with these parameters at this time (related to probabilities of specific noise realizations and the associated signal-to-noise ratios); in most cases this may be treated approximately as a step function.
 \end{tabular}
 
-This means that the expected rate of signals with masses $m_1$, $m_2$, etc. coming from $\Omega$ at time $t$ will be something like 
+\vspace{0.5cm}
+We also assume that reasonable priors for our Bayesian inference on a per-event basis follow the modeled astrophysical distribution so that
 \begin{equation}
-    \lambda = R(\Omega, m_1, m_2) \frac{dV}{d\Omega dt dm_1 dm_2} \Delta\Omega \Delta t \Delta m_1 \Delta m_2
+    \frac{p(m_1, m_2, z, \Omega|t,R)}{p(m_1^\prime, m_2^\prime, z^\prime, \Omega^\prime|t^\prime,R)} = \frac{R(m_1, m_2, z, \Omega) \left.(dV_c/d\Omega dz)\right|_{\Omega, z} p(\mathrm{detect}|m_1, m_2, z; t)}{R(m_1^\prime, m_2^\prime, z^\prime, \Omega^\prime) \left.(dV_c/d\Omega dz)\right|_{\Omega^\prime, z^\prime} p(\mathrm{detect}|m_1^\prime, m_2^\prime, z^\prime; t^\prime)}
 \end{equation}
-We therefore expect the probability of observing a signal within a short time window to be
-\begin{equation}
-    p(n=1|R, dV) = RdV e^{-RdV}
-\end{equation}
-which is a function of $t$, $\Omega$, $m_1$, $m_2$, etc.
-Furthermore, we take the probabilyt of observing no signals to be
-\begin{equation}
-    p(n=0|R, dv) = e^{-RdV}
-\end{equation}
-As long as we restrict ourselves to short enough time windows ($RdV/dt \Delta t \ll 1$), we can assume we will see either 0 or 1 events in any particular window and leave it at that.
 
-Now, we construct a joint likelihood of many different time segments, assuming each time segment is independent.
-Formally, we deconstruct this following Messenger+Veitch (2013) into segments for which data was recorded above some detection statistic and segments during which data was not recorded above some detection statistic as follows.
+This means that the expected number of signals with masses $m_1$, $m_2$, etc. coming from $\Omega$ at $z$ coincident with $t$ will be something like 
+\begin{equation}
+    N_\mathrm{astro} = R(m_1, m_2, \Omega, z) \frac{dV_c}{d\Omega dz} \Delta\Omega \Delta z \Delta m_1 \Delta m_2 \Delta t
+\end{equation}
+and we expect to detect 
+\begin{equation}
+    N_\mathrm{detect} = N_\mathrm{astro} p(\mathrm{detect}|m_1, m_2, z;t)
+\end{equation}
+
+Now, we consider rates that are low enough so that only one type of signal ($m_1$, $m_2$, $z$, $\Omega$) is detectable at a time and further model each type of signal as an independent Poisson process.
+Approximating this as a set of discrete bins indexed by $k$, we expect
 \begin{align}
-    p(\mathrm{data}|R) = & \prod\limits_{i\in d_i\geq\mathrm{thr}} \int d\theta_i p(\theta_i) \left[ p(d_i|\theta_i, \Omega, \mathrm{signal}) p(n=1|RdV_i) + p(d_i|\mathrm{noise})p(n=0|RdV_i) \right ] \nonumber \\
-                         & \times \prod\limits_{j\in d_j<\mathrm{thr}} \int d\theta_j p(\theta_j) \left[ p(d_j<\mathrm{thr}|\theta_j, \Omega, \mathrm{signal})p(n=1|RdV_j) + p(d_j<\mathrm{thr}|\mathrm{noise})p(n=0|RdV_j) \right] 
+    p(\mathrm{data}|\mathrm{signal}; R, t)p(\mathrm{signal}|R, t)\Delta t & = \sum_k p(n_k=1|R_k dV_k \mathcal{F}_k \Delta t) \prod\limits_{j \neq k} p(n_j=0|R_j dV_j \mathcal{F}_j \Delta t) p(\mathrm{data}|m_1^{(k)}, m_2^{(k)}, \Omega^{(k)}, z^{(k)}) \nonumber \\
+                                                                  & = \sum_k R_k dV_k \mathcal{F}_k \Delta t e^{-R_k dV_k \mathcal{F}_k \Delta t} \prod\limits_{j \neq k} e^{-R_j dV_j \mathcal{F}_j \Delta t} p(\mathrm{data}|m_1^{(k)}, m_2^{(k)}, \Omega^{(k)}, z^{(k)}) \nonumber \\
+                                                                  & = \sum_k R_k dV_k \mathcal{F}_k \Delta t p(\mathrm{data}|m_1^{(k)}, m_2^{(k)}, \Omega^{(k)}, z^{(k)}) e^{-\sum\limits_j R_j dV_j \mathcal{F}_j \Delta t} \nonumber \\
+                                                                  & = \Delta t \left[ \int dm_1 dm_2 dz d\Omega R \frac{dV_c}{d\Omega dz} \mathcal{F} p(\mathrm{data}|m_1, m_2, \Omega, z) \right] e^{-\left(\int dm_1 dm_2 dz d\Omega R \frac{dV_c}{d\Omega dz} \mathcal{F}\right) \Delta t} \\
+                                                                  & \propto \left[ \int dm_1 dm_2 dz d\Omega p(m_1, m_2, z, \Omega|t, R) p(\mathrm{data}|m_1, m_2, \Omega, z) \right] e^{-\left(\int dm_1 dm_2 dz d\Omega R \frac{dV_c}{d\Omega dz} \mathcal{F}\right) \Delta t} \\
+                                                                  & \propto \left[ \int dm_1 dm_2 dz d\Omega p(m_1, m_2, z, \Omega|\mathrm{data}; t, R) \right] e^{-\left(\int dm_1 dm_2 dz d\Omega R \frac{dV_c}{d\Omega dz} \mathcal{F}\right) \Delta t}
+\end{align}
+and similarly
+\begin{align}
+    p(\mathrm{data}|\mathrm{noise}; R, t)p(\mathrm{noise}|R, t) & = p(\mathrm{data}|\mathrm{noise}) e^{-\left(\int dm_1 dm_2 dz d\Omega R \frac{dV_c}{d\Omega dz} \mathcal{F}\right) \Delta t} \\
 \end{align}
 
-We then make a few simplifying assumptions based on informed choices of the threshold so that
+These define the relevant likelihoods for each small time segment.
+We assume many time segments are independent and then stack everything together.
+This give an overall joint likelihood of observing the set of detections we actually observed, conditioned on a Rate function: $R(m_1, m_2, z, \Omega)$.
+Thus, we obtain
 \begin{align}
-    p(d<\mathrm{thr}|\mathrm{noise}) & = 1 \\
-    p(d<\mathrm{thr}|\mathrm{signal}) & = 0 
+    p(\mathrm{data}|R) = & \prod\limits_{i|\mathrm{data}_i\geq\mathrm{thr}} \left[ \int dm_1 dm_2 dz d\Omega R \frac{dV_c}{d\Omega dz} \mathcal{F} p(\mathrm{data}_i|m_1, m_2, \Omega, z) \right] e^{-\left(\int dm_1 dm_2 dz d\Omega R \frac{dV_c}{d\Omega dz} \mathcal{F}\right) \Delta t_i} \\
+                         & \times \prod\limits_{l|\mathrm{data}_l<\mathrm{thr}} p(\mathrm{data}_l|\mathrm{noise} e^{-\left(\int dm_1 dm_2 dz d\Omega R \frac{dV_c}{d\Omega dz} \mathcal{F}\right) \Delta t_l} \\
+                 \propto & \prod\limits_{i|\mathrm{data}_i\geq\mathrm{thr}} \left[ \int dm_1 dm_2 dz d\Omega R \frac{dV_c}{d\Omega dz} \mathcal{F} p(\mathrm{data}_i|m_1, m_2, \Omega, z) \right] e^{-\int dt dm_1 dm_2 dz d\Omega R \frac{dV_c}{d\Omega dz} \mathcal{F}}
 \end{align}
-which means that we may need to ``renormalize'' the likelihood $p(d|\theta,\Omega,\mathrm{signal})$ appropriately to throw away all $d<\mathrm{thr}$.
-With these assumptions, our marginal likelihood then becomes
+or, alternatively,
 \begin{equation}
-    p(\mathrm{data}|R) \propto \left[ \prod\limits_{i\in d_i\geq\mathrm{thr}} \int d\theta_i \left( p(\theta_i) p(d_i|\theta_i, \Omega) dV_i \right) R e^{-R dV_i} \right] \left[ \prod\limits_{j\in d_j<\mathrm{thr}} \int d\theta_j p(\theta_j) e^{-RdV_j} \right]
+    \log p(\mathrm{data}|R) = - \int dt dm_1 dm_2 dz d\Omega R \frac{dV_c}{d\Omega dz} \mathcal{F} + \sum\limits_{i|\mathrm{data}_i\geq\mathrm{thr}} \log \left[ \int dm_1 dm_2 dz d\Omega R \frac{dV_c}{d\Omega dz} \mathcal{F} p(\mathrm{data}_i|m_1, m_2, \Omega, z) \right]
 \end{equation}
-where $dV_i$ is meant as short-hand for the sensitive volume within the associated time window in the associated direction for the associated masses, etc.
-We note that the marginalization over $p(\theta_i) p(d_i|\theta_i, \Omega) dV_i$ essentially gives you the skymap; factors of $dV_i$ here really just apply relative weights to different $\Omega$ based on the antenna patterns, which is already incorporated into our skymaps (weighting around the ring).
-There may be an overall normalization that hangs around, but it will not affect the relative weights assigned to different $\Omega$.
-In this sense, the distribution $R(\Omega)$ can be thought of as a prior on $\Omega$ in the skymap, which is exactly as it should be.
+which looks something like a Poisson factor for the overall rate along with the inner product of the evidence for each individual event.
+We can use this marginal likelihood for the Rate distribution to make inferences about the rate.
 
-We see that the problem then boils down to knowing two main things
-\begin{enumerate}
-    \item{the likelihood as a function of source location for each event separately, obtainable from existing posterior samples from each event and}
-    \item{measures of the ``exposure'' or $\int Vdt$ as a cumulative sum and as a function of time (we need the differential version for when we observe events).}
-\end{enumerate}
-Once we are able to compute this marginal likelihood at scale, we can perform model selection and all that jazz.
+Several approaches for sampling $p(R|\mathrm{data})$ have been proposed
+\begin{itemize}
+    \item bin the sky into separate pixels and run an MCMC direcly over the rate in each pixel. This can be expensive if there are a lot of pixels.
+    \item assume the deviations from isotropy are small and attempt to infer the posterior of the deviations using Gaussian processes (see below).
+\end{itemize}
+along with several sanity checks and/or back-of-the-envelop estimates
+\begin{itemize}
+    \item divide the sky into hemispheres and count the posterior weight in each hemisphere as a statistic looking for a dipole.
+    \item compute the 2-pt auto-correlation function between summed posteriors (look for preferred length scales).
+\end{itemize}
+
+\subsection*{Guassian process regression of anisotropies}
+
+\textbf{write this up. The key thing is to expand the log of the evidence in a Taylor expansion which makes the logLikelihood linear in the rate distribution, which yields an analytically tractable posterior with a Gaussian Process prior}
 
 %-------------------------------------------------
 \end{document}
