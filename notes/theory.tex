@@ -73,37 +73,47 @@ These define the relevant likelihoods for each small time segment.
 We assume many time segments are independent and then stack everything together.
 This give an overall joint likelihood of observing the set of detections we actually observed, conditioned on a Rate distribution: $R(m_1, m_2, z, \Omega)$.
 Following Messenger+Veitch (2013), we obtain
-
-\newpage
-\textcolor{red}{\textbf{WRITE the complete expression, then make simplifying assumptions to get what Will likes to use.}}
-
 \begin{align}
-    p(\mathrm{data}|R) = & \\
-                         & \prod\limits_{i|\mathrm{data}_i\geq\mathrm{thr}} \left[ \int dm_1 dm_2 dz d\Omega R \frac{dV_c}{d\Omega dz} \mathcal{F} p(\mathrm{data}_i|m_1, m_2, \Omega, z) \right] e^{-\left(\int dm_1 dm_2 dz d\Omega R \frac{dV_c}{d\Omega dz} \mathcal{F}\right) \Delta t_i} \\
-                         & \times \prod\limits_{l|\mathrm{data}_l<\mathrm{thr}} p(\mathrm{data}_l|\mathrm{noise} e^{-\left(\int dm_1 dm_2 dz d\Omega R \frac{dV_c}{d\Omega dz} \mathcal{F}\right) \Delta t_l} \\
-                 \propto & \prod\limits_{i|\mathrm{data}_i\geq\mathrm{thr}} \left[ \int dm_1 dm_2 dz d\Omega R \frac{dV_c}{d\Omega dz} \mathcal{F} p(\mathrm{data}_i|m_1, m_2, \Omega, z) \right] e^{-\int dt dm_1 dm_2 dz d\Omega R \frac{dV_c}{d\Omega dz} \mathcal{F}}
+    p(\mathrm{data}|R) = & \prod\limits_{i|d_i\geq\mathrm{thr}} \left[ p(d_i|\mathrm{noise}) + \int dm_1 dm_2 dz d\Omega p(d_i|m_1, m_2, z, \Omega) R\frac{dV_c}{d\Omega dz} \mathcal{F}_i \Delta t \right] e^{-\int dm_1 dm_2 dz d\Omega R\frac{dV_c}{d\Omega dz} \mathcal{F}_i \Delta t} \nonumber \\
+                         & \times \prod\limits_{j|d_j<\mathrm{thr}} \left[ p(d_i<\mathrm{thr}|\mathrm{noise}) + \int dm_1 dm_2 dz d\Omega p(d_i<\mathrm{thr}|m_1, m_2, z, \Omega) R\frac{dV_c}{d\Omega dz} \mathcal{F}_j \Delta t \right] e^{-\int dm_1 dm_2 dz d\Omega R\frac{dV_c}{d\Omega dz} \mathcal{F}_j \Delta t}
 \end{align}
-or, alternatively,
-\begin{equation}
-    \log p(\mathrm{data}|R) = - \int dt dm_1 dm_2 dz d\Omega R \frac{dV_c}{d\Omega dz} \mathcal{F} + \sum\limits_{i|\mathrm{data}_i\geq\mathrm{thr}} \log \left[ \int dm_1 dm_2 dz d\Omega R \frac{dV_c}{d\Omega dz} \mathcal{F} p(\mathrm{data}_i|m_1, m_2, \Omega, z) \right]
-\end{equation}
-which looks something like a Poisson factor for the overall rate along with the inner product of the evidence for each individual event.
+which we simplify by assuming
+\begin{align}
+    p(d_i<\mathrm{thr}|\mathrm{noise}) & = 1 \\
+    p(d_i<\mathrm{thr}|m_1, m_2, z, \Omega)\mathcal{F}_i & = 0
+\end{align}
+This is equivalent to normalizing the likelihood appropriately to assume we only see signals above our threshold. 
+In reality, we should be able to extract more information by lowering the threshold to include marginal events, but the associated benefits are expected to be realtively small with a significant computational overhead.
+With our simplifying assumptions, we obtain
+\begin{multline}
+    \log p(\mathrm{data}|R) = - \int dt dm_1 dm_2 dz d\Omega \left(R \frac{dV_c}{d\Omega dz} \mathcal{F}\right) \\
+         + \sum\limits_{i|d_i\geq\mathrm{thr}} \log \left[ \Delta t \int dm_1 dm_2 dz d\Omega \left(R \frac{dV_c}{d\Omega dz} \mathcal{F}\right) p(d_i|m_1, m_2, \Omega, z) \right] \\
+         + \text{terms independent of }R
+\end{multline}
+This looks something like a Poisson factor for the overall rate along with the inner product of the evidence for each individual event.
 We can use this marginal likelihood for the Rate distribution to make inferences about the rate.
-
 Several approaches for sampling $p(R|\mathrm{data})$ have been proposed
 \begin{itemize}
-    \item bin the sky into separate pixels and run an MCMC direcly over the rate in each pixel. This can be expensive if there are a lot of pixels.
+    \item bin the sky into separate voxels and run an MCMC direcly over the rate in each voxel. This can be expensive if there are a lot of voxels.
     \item assume the deviations from isotropy are small and attempt to infer the posterior of the deviations using Gaussian processes (see below).
 \end{itemize}
 along with several sanity checks and/or back-of-the-envelop estimates
 \begin{itemize}
     \item divide the sky into hemispheres and count the posterior weight in each hemisphere as a statistic looking for a dipole.
-    \item compute the 2-pt auto-correlation function between summed posteriors (look for preferred length scales).
+    \item compute the 2-point auto-correlation function with stacked posteriors to look for preferred length scales.
 \end{itemize}
+
+%------------------------
+
+\subsection*{Marginal likelihood for $R(\Omega)$}
+
+\textcolor{red}{We note that we're primarily interested in $R(\Omega)$ at the moment and assume independence from ($m_1$, $m_2$, $z$) and marginalize those away.}
+
+%------------------------
 
 \subsection*{Guassian process regression of anisotropies}
 
-\textbf{write this up. The key thing is to expand the log of the evidence in a Taylor expansion which makes the logLikelihood linear in the rate distribution, which yields an analytically tractable posterior with a Gaussian Process prior}
+\textcolor{red}{write this up. The key thing is to expand the log of the evidence in a Taylor expansion which makes the logLikelihood linear in the rate distribution, which yields an analytically tractable posterior with a Gaussian Process prior}
 
 %-------------------------------------------------
 \end{document}
