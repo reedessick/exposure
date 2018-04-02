@@ -105,15 +105,70 @@ along with several sanity checks and/or back-of-the-envelop estimates
 
 %------------------------
 
-\subsection*{Marginal likelihood for $R(\Omega)$}
+\subsection*{Marginal likelihood for $R_\Omega$}
 
-\textcolor{red}{We note that we're primarily interested in $R(\Omega)$ at the moment and assume independence from ($m_1$, $m_2$, $z$) and marginalize those away.}
+If we are only interested in isotropy contraints at the moment, we can assume a separation of the rate distribition: $R = p_{m,z}(m_1, m_2, z) R_\Omega(\Omega)$.
+We have adopted a separation of variables in which the mass and redshift distribution integrates to one and the units are carried by the angular dependence.
+Thus, adopting the convention
+\begin{align}
+    \mathcal{N} p_\Omega & = \int dm_1 dm_2 dz\, \left(p_{m,z} \frac{dV_c}{d\Omega dz} \mathcal{F}\right) \\
+    \int d\Omega p_\Omega & = 1
+\end{align}
+so that
+\begin{equation}
+    \int dm_1 dm_2 dz \left( p_{m,z}\frac{dV_c}{d\Omega dz} \mathcal{F}\right) p(d_i|m_1, m_2, z, \Omega) = \mathcal{N} p(\Omega|d_i)
+\end{equation}
+we find
+\begin{align}
+    \log p(\mathrm{data}|R) \supset & - \int d\Omega\, R_\Omega \int dt \mathcal{N} p_\Omega + \sum\limits_{i|d_i\geq\mathrm{thr}} \log \left[ \Delta t \mathcal{N} \int d\Omega\, R_\Omega p(\Omega|d_i) \right] \\
+                            \supset & - R_o \int d\Omega\, r_\Omega \int dt \mathcal{N} p_\Omega + \sum\limits_{i|d_i\geq\mathrm{thr}} \log \left[ \int d\Omega\, r_\Omega p(\Omega|d_i) \right] + \log\left[ R_o \mathcal{N} \Delta t \right]
+\end{align}
+where $R_\Omega = R_o r_\Omega$ and $R_o$ alone carries units.
+We note that if we further require $\int d\Omega r_\Omega = 1$, $R_o$ sets the overall rate of signals detectable in our detectors.
+This also shows that inference about $R_\Omega$ can be performed with knowledge of the a posteriori skymaps from each detection ($p(\Omega|d_i)$) and overall measures of the exposure as a function of $\Omega$ integrated over time ($\int dt \mathcal{N} p_\Omega$).
+
+If we assume an isotropic distribution ($r_\Omega = 1/4\pi$), we obtain the expected inference for the overall rate of signals $R_o$.
+In general, we will have to infer both $R_o$ and $r_\Omega$ simultaneously.
+
 
 %------------------------
 
-\subsection*{Guassian process regression of anisotropies}
+\subsection*{Analytic regression of small anisotropies}
 
-\textcolor{red}{write this up. The key thing is to expand the log of the evidence in a Taylor expansion which makes the logLikelihood linear in the rate distribution, which yields an analytically tractable posterior with a Gaussian Process prior}
+Let us assume that $r_\Omega$ is nearly isotropic so that 
+\begin{equation}
+    \left. r_\Omega = \frac{1+\delta} \ \right| \ \delta \ll 1 \ \forall \ \Omega
+\end{equation}
+This yields
+\begin{align}
+    \log p(\mathrm{data}|R) \supset & - R_o \int dt \mathcal{N} + \sum\limits_{i|d_i\geq\mathrm{thr}} \left( \log\left[ R_o \mathcal{N} \Delta t \right] + 1 \right) \\
+                                    & \quad \quad - R_o \int d\Omega\, \delta \int dt \mathcal{N} p_\Omega + \int d\Omega\, \delta \sum\limits_{i|d_i\geq\mathrm{thr}} p(\Omega|d_i) + O\left(\delta^2\right)
+\end{align}
+We note that, in this approximation, the log likelihood is linear in $\delta$ and therefore suitable for various analytic priors. 
+
+As a purely pedagogical note, we examine the linear cofactor for $\delta$
+\begin{equation}
+    -R_o \int dt \mathcal{N} p_\Omega + \sum\limits_{i|d_i\geq\mathrm{thr}} p(\Omega|d_i)
+\end{equation}
+The first term is the Poisson factor accounting for how much exposure we have in any particular direction. 
+All else being equal, if the exposure increases in a direction without more associated detections, the anisotropy is infered to be negative ($\delta < 0$). 
+Similarly, if there is an excess of detections infered from a certain direction without an increased exposure, the anisotropy is infered to be positive ($\delta > 0$).
+We also note that the intuitive notion of simply ``adding posteriors'' to look for excesses drops out of the linear approximaiton, although it is too naive for the more general inference.
+
+One possible choice is a Gamma distribution for each $\Omega$ separately, which will yield an analytic Lomax posterior for each $\Omega$, related to the Pareto distribution.
+Any correlations between neighboring $\Omega$ would come from the likelihood alone.
+
+Another possible choice is a Guassian Process prior for $\delta$ assuming some covariance. 
+A common choice might be the squared-exponential covariance kernel such that
+\begin{equation}
+    \left. \text{Cov}(\delta_1, \delta_2) = \sigma^2 \exp \left[ -\frac{\left(\Delta \theta\right)^2}{2l^2}\right] \quad  \right| \ \Delta \theta = \cos^{-1}\left(\cos\theta_1\cos\theta_2 + \sin\theta_1\sin\theta_2\cos(\phi_1-\phi_2)\right)
+\end{equation}
+If we wish to avoid introducing a length scale in our prior (i.e.: we're interested in measureing clustering), we can take the limit $l \rightarrow 0$ to obtain a ``white noise'' prior instead.
+However, maximizing the associated likelihood as a function of $l$ may be a natural way to infer length scales in the data.
+
+Assuming this prior and completing the square yields analytic inferences for $\delta$ at whatever resolution is desired along with error estimates.
+Furthermore, because we assume $\delta \ll 1 \ \forall \ \Omega$, zero-mean Gaussian priors on $\delta$ are not unreasonable.
+We also note that, in this approximation, the inferred posterior mean is given by the linear cofactor of $\delta$ in the likelihood.
 
 %-------------------------------------------------
 \end{document}
