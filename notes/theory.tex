@@ -37,7 +37,7 @@ A bit of nomenclature
 \vspace{0.5cm}
 \begin{tabular}{p{3cm}p{12cm}}
     $R(m_1, m_2, z, \Omega)$ & the rate of signals from a direction in the sky ($\Omega$) at redshift $z$ with masses $m_1$, $m_2$, etc, measured with respect to detector-frame time. \\
-    $dV/d\Omega dz$     & the differntial sensitive volume observed by our detectors as a function of time, position on the sky, and $z$, which depends on the detector sensitivity. \\
+    $dV_c/d\Omega dz$     & the differntial sensitive co-moving volume observed by our detectors as a function of time, position on the sky, and $z$, which depends on the detector sensitivity. \\
     $\mathcal{F}(m_1,m_2,z,\Omega;t)$ & the probability of detecting a signal with these parameters at this time (related to probabilities of specific noise realizations and the associated signal-to-noise ratios); in most cases this may be treated approximately as a step function.
 \end{tabular}
 
@@ -66,16 +66,17 @@ Approximating this as a set of discrete bins indexed by $k$, we expect
 \end{align}
 and similarly
 \begin{align}
-    p(\mathrm{data}|\mathrm{noise}; R, t)p(\mathrm{noise}|R, t) & = p(\mathrm{data}|\mathrm{noise}) \prod\limits_j p(n_j=0|R_jdV_j \mathcal{F}_j \Delta t) \\
-                                                                & = p(\mathrm{data}|\mathrm{noise}) e^{-\left[\int dm_1 dm_2 dz d\Omega \left(R \frac{dV_c}{d\Omega dz} \mathcal{F}\right)\right] \Delta t} \\
+    p(\mathrm{data}|\mathrm{noise}; R, t)p(\mathrm{noise}|R, t) & = p(\mathrm{data}|\mathrm{noise}) \prod\limits_j p(n_j=0|R_jdV_j \mathcal{F}_j \Delta t) \nonumber \\
+                                                                & = p(\mathrm{data}|\mathrm{noise}) e^{-\left[\int dm_1 dm_2 dz d\Omega \left(R \frac{dV_c}{d\Omega dz} \mathcal{F}\right)\right] \Delta t} 
 \end{align}
 These define the relevant likelihoods for each small time segment.
 We assume many time segments are independent and then stack everything together.
 This give an overall joint likelihood of observing the set of detections we actually observed, conditioned on a Rate distribution: $R(m_1, m_2, z, \Omega)$.
 Following Messenger+Veitch (2013), we obtain
 \begin{align}
-    p(\mathrm{data}|R) = & \prod\limits_{i|d_i\geq\mathrm{thr}} \left[ p(d_i|\mathrm{noise}) + \int dm_1 dm_2 dz d\Omega p(d_i|m_1, m_2, z, \Omega) R\frac{dV_c}{d\Omega dz} \mathcal{F}_i \Delta t \right] e^{-\int dm_1 dm_2 dz d\Omega R\frac{dV_c}{d\Omega dz} \mathcal{F}_i \Delta t} \nonumber \\
-                         & \times \prod\limits_{j|d_j<\mathrm{thr}} \left[ p(d_i<\mathrm{thr}|\mathrm{noise}) + \int dm_1 dm_2 dz d\Omega p(d_i<\mathrm{thr}|m_1, m_2, z, \Omega) R\frac{dV_c}{d\Omega dz} \mathcal{F}_j \Delta t \right] e^{-\int dm_1 dm_2 dz d\Omega R\frac{dV_c}{d\Omega dz} \mathcal{F}_j \Delta t}
+    p(\mathrm{data}|R) = & \prod\limits_{i|d_i\geq\mathrm{thr}} \left[ p(d_i|\mathrm{noise}) + \int dm_1 dm_2 dz d\Omega \left( R\frac{dV_c}{d\Omega dz} \mathcal{F}_i \Delta t \right) p(d_i|m_1, m_2, z, \Omega) \right] e^{-\int dm_1 dm_2 dz d\Omega R\frac{dV_c}{d\Omega dz} \mathcal{F}_i \Delta t} \nonumber \\
+                         & \times \prod\limits_{j|d_j<\mathrm{thr}} \left[ p(d_i<\mathrm{thr}|\mathrm{noise}) \right. \nonumber \\
+                         & \quad \quad \quad \quad \quad + \left. \int dm_1 dm_2 dz d\Omega \left( R\frac{dV_c}{d\Omega dz} \mathcal{F}_j \Delta t \right) p(d_i<\mathrm{thr}|m_1, m_2, z, \Omega) \right] e^{-\int dm_1 dm_2 dz d\Omega R\frac{dV_c}{d\Omega dz} \mathcal{F}_j \Delta t}
 \end{align}
 which we simplify by assuming
 \begin{align}
@@ -90,12 +91,12 @@ With our simplifying assumptions, we obtain
          + \sum\limits_{i|d_i\geq\mathrm{thr}} \log \left[ \Delta t \int dm_1 dm_2 dz d\Omega \left(R \frac{dV_c}{d\Omega dz} \mathcal{F}\right) p(d_i|m_1, m_2, \Omega, z) \right] \\
          + \text{terms independent of }R
 \end{multline}
-This looks something like a Poisson factor for the overall rate along with the inner product of the evidence for each individual event.
+This looks something like a Poisson factor for the overall rate along with the evidence for each individual event.
 We can use this marginal likelihood for the Rate distribution to make inferences about the rate.
 Several approaches for sampling $p(R|\mathrm{data})$ have been proposed
 \begin{itemize}
     \item bin the sky into separate voxels and run an MCMC direcly over the rate in each voxel. This can be expensive if there are a lot of voxels.
-    \item assume the deviations from isotropy are small and attempt to infer the posterior of the deviations using Gaussian processes (see below).
+    \item assume the deviations from isotropy are small and attempt to infer the posterior of the deviations analytically (see below).
 \end{itemize}
 along with several sanity checks and/or back-of-the-envelop estimates
 \begin{itemize}
@@ -107,9 +108,9 @@ along with several sanity checks and/or back-of-the-envelop estimates
 
 \subsection*{Marginal likelihood for $R_\Omega$}
 
-If we are only interested in isotropy contraints at the moment, we can assume a separation of the rate distribition: $R = p_{m,z}(m_1, m_2, z) R_\Omega(\Omega)$.
+We assume a separation of the rate distribition: $R = p_{m,z}(m_1, m_2, z) R_\Omega(\Omega)$.
 We have adopted a separation of variables in which the mass and redshift distribution integrates to one and the units are carried by the angular dependence.
-Thus, adopting the convention
+Thus,
 \begin{align}
     \mathcal{N} p_\Omega & = \int dm_1 dm_2 dz\, \left(p_{m,z} \frac{dV_c}{d\Omega dz} \mathcal{F}\right) \\
     \int d\Omega p_\Omega & = 1
@@ -118,9 +119,10 @@ so that
 \begin{equation}
     \int dm_1 dm_2 dz \left( p_{m,z}\frac{dV_c}{d\Omega dz} \mathcal{F}\right) p(d_i|m_1, m_2, z, \Omega) = \mathcal{N} p(\Omega|d_i)
 \end{equation}
-we find
+where $p(\Omega|d_i)$ is the a posteriori skymap for event $i$.
+We find
 \begin{align}
-    \log p(\mathrm{data}|R) \supset & - \int d\Omega\, R_\Omega \int dt \mathcal{N} p_\Omega + \sum\limits_{i|d_i\geq\mathrm{thr}} \log \left[ \Delta t \mathcal{N} \int d\Omega\, R_\Omega p(\Omega|d_i) \right] \\
+    \log p(\mathrm{data}|R) \supset & - \int d\Omega\, R_\Omega \int dt \mathcal{N} p_\Omega + \sum\limits_{i|d_i\geq\mathrm{thr}} \log \left[ \Delta t \mathcal{N} \int d\Omega\, R_\Omega p(\Omega|d_i) \right] \nonumber \\
                             \supset & - R_o \int d\Omega\, r_\Omega \int dt \mathcal{N} p_\Omega + \sum\limits_{i|d_i\geq\mathrm{thr}} \log \left[ \int d\Omega\, r_\Omega p(\Omega|d_i) \right] + \log\left[ R_o \mathcal{N} \Delta t \right]
 \end{align}
 where $R_\Omega = R_o r_\Omega$ and $R_o$ alone carries units.
@@ -137,38 +139,38 @@ In general, we will have to infer both $R_o$ and $r_\Omega$ simultaneously.
 
 Let us assume that $r_\Omega$ is nearly isotropic so that 
 \begin{equation}
-    \left. r_\Omega = \frac{1+\delta} \ \right| \ \delta \ll 1 \ \forall \ \Omega
+    \left. r_\Omega = 1+\delta \ \right| \ \delta \ll 1 \ \forall \ \Omega
 \end{equation}
 This yields
 \begin{align}
-    \log p(\mathrm{data}|R) \supset & - R_o \int dt \mathcal{N} + \sum\limits_{i|d_i\geq\mathrm{thr}} \left( \log\left[ R_o \mathcal{N} \Delta t \right] + 1 \right) \\
-                                    & \quad \quad - R_o \int d\Omega\, \delta \int dt \mathcal{N} p_\Omega + \int d\Omega\, \delta \sum\limits_{i|d_i\geq\mathrm{thr}} p(\Omega|d_i) + O\left(\delta^2\right)
+    \log p(\mathrm{data}|R) \supset & \left( - R_o \int dt \mathcal{N} + \sum\limits_{i|d_i\geq\mathrm{thr}} \left( \log\left[ R_o \mathcal{N} \Delta t \right] + 1 \right) \right) \nonumber \\
+                                    & \quad \quad \quad \quad + \left( \int d\Omega\, \delta \left[ - R_o \int dt \mathcal{N} p_\Omega + \sum\limits_{i|d_i\geq\mathrm{thr}} p(\Omega|d_i) \right] \right) + O\left(\delta^2\right)
 \end{align}
 We note that, in this approximation, the log likelihood is linear in $\delta$ and therefore suitable for various analytic priors. 
 
 As a purely pedagogical note, we examine the linear cofactor for $\delta$
-\begin{equation}
+\begin{equation}\label{eq:linear cofactor}
     -R_o \int dt \mathcal{N} p_\Omega + \sum\limits_{i|d_i\geq\mathrm{thr}} p(\Omega|d_i)
 \end{equation}
 The first term is the Poisson factor accounting for how much exposure we have in any particular direction. 
 All else being equal, if the exposure increases in a direction without more associated detections, the anisotropy is infered to be negative ($\delta < 0$). 
 Similarly, if there is an excess of detections infered from a certain direction without an increased exposure, the anisotropy is infered to be positive ($\delta > 0$).
-We also note that the intuitive notion of simply ``adding posteriors'' to look for excesses drops out of the linear approximaiton, although it is too naive for the more general inference.
+We also note that the intuitive notion of simply ``adding posteriors'' to look for excesses emerges naturally in the linear approximaiton, although it is too naive for the more general inference.
 
 One possible choice is a Gamma distribution for each $\Omega$ separately, which will yield an analytic Lomax posterior for each $\Omega$, related to the Pareto distribution.
-Any correlations between neighboring $\Omega$ would come from the likelihood alone.
+Any correlations between posterior distributions for $\delta$ at neighboring $\Omega$ would come from the likelihood alone.
 
-Another possible choice is a Guassian Process prior for $\delta$ assuming some covariance. 
+Another possible choice is a Guassian Process (GP) prior for $\delta$ assuming some covariance. 
 A common choice might be the squared-exponential covariance kernel such that
 \begin{equation}
     \left. \text{Cov}(\delta_1, \delta_2) = \sigma^2 \exp \left[ -\frac{\left(\Delta \theta\right)^2}{2l^2}\right] \quad  \right| \ \Delta \theta = \cos^{-1}\left(\cos\theta_1\cos\theta_2 + \sin\theta_1\sin\theta_2\cos(\phi_1-\phi_2)\right)
 \end{equation}
 If we wish to avoid introducing a length scale in our prior (i.e.: we're interested in measureing clustering), we can take the limit $l \rightarrow 0$ to obtain a ``white noise'' prior instead.
-However, maximizing the associated likelihood as a function of $l$ may be a natural way to infer length scales in the data.
+However, maximizing the associated posterior as a function of $l$ may be a natural way to infer length scales in the data.
 
-Assuming this prior and completing the square yields analytic inferences for $\delta$ at whatever resolution is desired along with error estimates.
+Assuming the GP prior and completing the square yields analytic inferences for $\delta$ at whatever resolution is desired along with error estimates.
 Furthermore, because we assume $\delta \ll 1 \ \forall \ \Omega$, zero-mean Gaussian priors on $\delta$ are not unreasonable.
-We also note that, in this approximation, the inferred posterior mean is given by the linear cofactor of $\delta$ in the likelihood.
+We also note that, in this approximation, the inferred posterior mean is related to the linear cofactor of $\delta$ in the likelihood (Eqn~\ref{eq:linear cofactor}).
 
 %-------------------------------------------------
 \end{document}
