@@ -201,9 +201,17 @@ and the posterior's normalization depends on $R_o$.
 
 Furthermore, because $\varepsilon\ll1$, we should be able to infer $R_o$ independently of $\varepsilon$ and then simply marginalize over it here.
 \begin{equation}
-    p(\varepsilon|\mathrm{data}) = \int dR_o p(\varepsilon|\mathrm{data},R_o)p(R_o|\mathrm{data})
+    p(\varepsilon|\mathrm{data}) = \int dR_o\, p(\varepsilon|\mathrm{data},R_o)p(R_o|\mathrm{data}) \propto p(\varepsilon) \int dR_o\, p(\mathrm{data}|R_o, \varepsilon)p(R_o)
 \end{equation}
-This has the advantage of letting us quickly, and quasi-analytically, obtain posterior processes for $\varepsilon$ using already published estimates of $R_o$, exposure estimates, and posterior skymaps for individual detections alone.
+Alternatively, we can analytically marginalize over $\varepsilon$ to derive a likelihood for $R_o$ alone, from which we can sample $R_o$ and then use that empirical distribution to make inferences about $\varepsilon$.
+\begin{equation}
+    p(R_o|\mathrm{data}) \propto p(R_o) \int \mathcal{D}\varepsilon\, p(\mathrm{data}|R_o, \varepsilon)p(\varepsilon)
+\end{equation}
+This has the advantage of letting us quickly, and quasi-analytically, obtain posterior processes for $\varepsilon$ using already published estimates of $R_o$, exposure estimates, and posterior skymaps for individual detections alone. 
+
+We also note that we can examine how informative the data is by investigating the covariance matrix for $\varepsilon$.
+For instance, we note that the covariance matrix is inversely proportional to the number of detected events (roughly), meaning the side of confidence regions should scale as $\propto 1/\sqrt{N_\mathrm{events}}$.
+This will immediately tell us whether our approximation $\varepsilon\ll1\ \forall\ \Omega$ can be justified by the likelihood, or whether the uncertainties are large enough that any constraints will come from the prior alone.
 
 %-------------------------------------------------
 \end{document}
