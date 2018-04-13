@@ -64,6 +64,9 @@ and we expect to detect
 
 Now, we consider rates that are low enough so that only one type of signal ($m_1$, $m_2$, $z$, $\Omega$) is detectable at a time and further model each type of signal as an independent Poisson process.
 We then marginalize over all possible signal parameters, which we approximate by a set of discrete bins indexed by $k$, and noise realizations, which we approximate by an indepdendent set of discrete bins indexed by $\alpha$.
+For each combination of $k$ and $\alpha$, we expect the rate of detectable signals in the detectors to be $\mathrm{rate} = R_k dV_k p(n_\alpha) \Theta_{k,\alpha}$, where we've abbreviated some of the terms from above.
+This is because there will be an overall rate of $R_k dV_k$ astrophysical events in our detectors, and the relative frequency with which each of these events will have noise realization $n_\alpha$ is $p(n_\alpha)$.
+Finally, if the signal and noise are not above threshold, then the rate of signals above threshold vanishes and this is captured by $\Theta_{k,\alpha}$.
 Thus, we expect
 \begin{align}
     p(\mathrm{data}=d|\mathrm{signal}; R, t)p(\mathrm{signal}|R, t) & = \left. \sum_{k,\alpha} \right[ p(N_{k,\alpha}=1|R_k dV_k p(n_\alpha)\Theta_{k,\alpha} \Delta t) \prod\limits_{j \neq k, \beta \neq \alpha} p(N_{j,\beta}=0|R_j dV_j p(n_\beta)\Theta_{j,\beta} \Delta t) \nonumber \\
@@ -76,7 +79,7 @@ Thus, we expect
 where in the second-to-last line we use the fact that $(d\geq\mathrm{thr})$ to drop the factor of $\Theta_{k,\alpha}$ because there is a detectable signal in the data, and in the last line we've assumed the standard notation $p(d|m_1,m_2,\Omega,z)=p(n=d-h(m_1,m_2,\Omega,z)$.
 Similarly, we obtain
 \begin{align}
-    p(\mathrm{data}=d|\mathrm{noise}; R, t)p(\mathrm{noise}|R, t) & = p(n=d) \prod\limits_{j,\beta} p(n_{j,\beta}=0|R_jdV_j p_\beta(\mathrm{noise})\Theta_{j,\beta} \Delta t) \nonumber \\
+    p(\mathrm{data}=d|\mathrm{noise}; R, t)p(\mathrm{noise}|R, t) & = p(n=d) \prod\limits_{j,\beta} p(N_{j,\beta}=0|R_jdV_j p_\beta(\mathrm{noise})\Theta_{j,\beta} \Delta t) \nonumber \\
                                                                 & = p(d|\mathrm{noise}) e^{-\left[\int dm_1 dm_2 dz d\Omega \left(R \frac{dV_c}{d\Omega dz} \mathcal{F}\right)\right] \Delta t} 
 \end{align}
 where I've again switched to more standard notation in the last line: $p(d|\mathrm{noise}) = p(n=d)$.
