@@ -147,31 +147,32 @@ Special care must be taken to guarantee that $R(\Omega)\geq0\ \forall\ \Omega$, 
 
 %------------------------
 
-\subsection*{Analytic regression of small anisotropies}
+\subsection*{Analytic regression of small (perturbative) anisotropies}
 
-Let us assume that $r_\Omega$ is nearly isotropic so that 
+Let us assume that $R_\Omega$ is well described by a simple model $R_o(\Omega)$, perhaps containing only a few spherical harmonics or otherwise describing only large-scale features.
+We then consider small perturbations to the simple model so that 
 \begin{equation}
-    \left. R_\Omega = R_o\left(1+\varepsilon\right) \ \right| \ \varepsilon \ll 1 \ \forall \ \Omega
+    \left. R_\Omega = R_o(\Omega)\left(1+\varepsilon(\Omega)\right) \ \right| \ \varepsilon \ll 1 \ \forall \ \Omega
 \end{equation}
 This yields
 \begin{align}
-    \log p(\mathrm{data}|R) \supset & \left( - R_o \int dt \mathcal{N} + \sum\limits_{i|d_i\geq\mathrm{thr}} \left( \log\left[ R_o \mathcal{N} \Delta t \right] + 1 \right) \right) \nonumber \\
-                                    & \quad \quad \quad \quad + \left( \int d\Omega\, \varepsilon \left[ - R_o \int dt \mathcal{N} p_\Omega + \sum\limits_{i|d_i\geq\mathrm{thr}} p(\Omega|d_i) \right] \right) \nonumber \\
-                                    & \quad \quad \quad \quad \quad \quad \quad \quad - \left( \frac{1}{2}\int d\Omega d\Omega^\prime \varepsilon(\Omega) \left[ \sum\limits_{i|d_i\geq\mathrm{thr}} p(\Omega|d_i) p(\Omega^\prime|d_i \right] \varepsilon(\Omega^\prime) \right) \nonumber \\
+    \log p(\mathrm{data}|R) \supset & \left( - \int d\Omega R_o \int dt \mathcal{N}p_\Omega + \sum\limits_{i|d_i\geq\mathrm{thr}} \left( \log\left[ \int d\Omega R_o \mathcal{N}p_\Omega \Delta t \right] \right) \right) \nonumber \\
+                                    & \quad \quad \quad \quad + \left( \int d\Omega\, \varepsilon R_o \left[ - \int dt \mathcal{N} p_\Omega + \sum\limits_{i|d_i\geq\mathrm{thr}} p(\Omega|d_i) \right] \right) \nonumber \\
+                                    & \quad \quad \quad \quad \quad \quad \quad \quad - \left( \frac{1}{2}\int d\Omega d\Omega^\prime \varepsilon(\Omega) \left[ R_o(\Omega) R_o(\Omega^\prime) \sum\limits_{i|d_i\geq\mathrm{thr}} p(\Omega|d_i) p(\Omega^\prime|d_i) \right] \varepsilon(\Omega^\prime) \right) \nonumber \\
                                     & \quad \quad \quad \quad \quad \quad \quad \quad \quad \quad + O\left(\varepsilon^3\right)
 \end{align}
 We note that, in this approximation, the likelihood is a well-behaved Gaussian in $\varepsilon$ and therefore amenable to analytic priors.
 Specifically,
 \begin{align}
-    0 & \leq \left[\int d\Omega \varepsilon \sum\limits_{i|d_i\geq\mathrm{thr}} p(\Omega|d_i)\right]^2 \nonumber \\
-      & = \int d\Omega d\Omega^\prime \varepsilon(\Omega) \varepsilon(\Omega^\prime) \left[ \sum\limits_{i|d_i\geq\mathrm{thr}} p(\Omega|d_i) p(\Omega^\prime|d_i \right] \\
+    0 & \leq \left[\int d\Omega \varepsilon R_o \sum\limits_{i|d_i\geq\mathrm{thr}} p(\Omega|d_i)\right]^2 \nonumber \\
+      & = \int d\Omega d\Omega^\prime \varepsilon(\Omega) \varepsilon(\Omega^\prime) \left[ R_o(\Omega) R_o(\Omega^\prime) \sum\limits_{i|d_i\geq\mathrm{thr}} p(\Omega|d_i) p(\Omega^\prime|d_i \right] \\
       & = \int d\Omega d\Omega^\prime \varepsilon(\Omega) \varepsilon(\Omega^\prime) P(\Omega, \Omega^\prime)
 \end{align}
-which implies that $P(\Omega, \Omega^\prime)$ is positive semi-definite and therefore $P^{-1} = \mathrm{cov}\left(\varepsilon(\Omega), \varepsilon(\Omega^\prime)\right)$ is also semi-definie.
+which implies that $P(\Omega, \Omega^\prime)$ is positive semi-definite and therefore $P^{-1} = \mathrm{cov}\left(\varepsilon(\Omega), \varepsilon(\Omega^\prime)\right)$ is also positive semi-definie.
 
 As a purely pedagogical note, we examine the linear cofactor for $\varepsilon$
 \begin{equation}\label{eq:linear cofactor}
-    -R_o \int dt \mathcal{N} p_\Omega + \sum\limits_{i|d_i\geq\mathrm{thr}} p(\Omega|d_i)
+    R_o \left( - \int dt \mathcal{N} p_\Omega + \sum\limits_{i|d_i\geq\mathrm{thr}} p(\Omega|d_i)\right)
 \end{equation}
 The first term is the Poisson factor accounting for how much exposure we have in any particular direction. 
 All else being equal, if the exposure increases in a direction without more associated detections, the anisotropy is infered to be negative ($\varepsilon < 0$). 
@@ -194,8 +195,8 @@ To wit, we obtain
 \end{equation}
 where
 \begin{align}
-    A(\Omega) & = -R_o\int dt\mathcal{N}p_\Omega + \sum\limits_{i|d_i\geq\mathrm{thr}} p(\Omega|d_i) \\
-    \Gamma(\Omega, \Omega^\prime) & = \Xi^{-1} + \sum\limits_{i|d_i\geq\mathrm{thr}} p(\Omega|d_i)p(\Omega^\prime|d_i)
+    A(\Omega) & = R_o\left( -\int dt\mathcal{N}p_\Omega + \sum\limits_{i|d_i\geq\mathrm{thr}} p(\Omega|d_i) \right) \\
+    \Gamma(\Omega, \Omega^\prime) & = \Xi^{-1} + R_o(\Omega) R_o(\Omega^\prime) \sum\limits_{i|d_i\geq\mathrm{thr}} p(\Omega|d_i)p(\Omega^\prime|d_i)
 \end{align}
 and the posterior's normalization depends on $R_o$.
 
@@ -212,6 +213,31 @@ This has the advantage of letting us quickly, and quasi-analytically, obtain pos
 We also note that we can examine how informative the data is by investigating the covariance matrix for $\varepsilon$.
 For instance, we note that the covariance matrix is inversely proportional to the number of detected events (roughly), meaning the side of confidence regions should scale as $\propto 1/\sqrt{N_\mathrm{events}}$.
 This will immediately tell us whether our approximation $\varepsilon\ll1\ \forall\ \Omega$ can be justified by the likelihood, or whether the uncertainties are large enough that any constraints will come from the prior alone.
+
+\subsubsection*{model complexity and null eigenvectors}
+
+To determine how informative the data can be in our perturbative analysis, we examine the eigenvalues of $P(\Omega, \Omega^\prime) = R_o(\Omega) R_o(\Omega^\prime) \sum\limits_i p(\Omega|d_i) p(\Omega^\prime|d_i)$.
+Indeed, this matrix appears to have an extremely large number of null eigenvectors. 
+Although this has not been demonstrated rigorously, it seems like the number of non-zero eigenvalues is approximately equal to the number of events included in the sum.
+This means that we cannot constrain arbitrarily complex models with finite amounds of data.
+It also tells us which particular correlations between different $\varepsilon(\Omega)$ can be constrained with existing data; if one allows oneself to gerrymander ``model bins'' according to the non-null eigenvectors one can define something like the ``smallest possible data-informed model.''
+
+Again, because all our inference is based on inner products, we can alternatively specify $\varepsilon_{lm}$ and a poserteriori distributions for sets of these coefficients. 
+However, we expect that there will continue to be many null-eigenvectors in this representation as well.
+
+We note that applying a non-trivial prior ($\Xi$), such as the squared-exponential Gaussian Process prior we suggested, can break these degeneracies and allow one to compute a posteriori processes for arbitrarily complicated $\varepsilon$.
+However, the vast majority of ``measurements'' will be prior dominated in that case.
+
+\subsubsection*{implications for CMB analysis}
+
+This perturbative approach may be naturally applicable to CMB analyses looking for anisotropies. 
+Indeed, it may provide an analytic estimate of the a posteriori joint distribution for the $a_{lm}$, which in turn can produce a posteriori joint distributions for the $C_{lm}$.
+This is particularly attractive because the observed CMB signal is dominated by a monopole and dipole with much smaller additional anisotropies; this is exactly the case we consider with a ``known model'' $R_o$ and small perturbations $\varepsilon$.
+
+However, before claiming a perfect match we should read instrument paper describing how the CMB detectors actually record data and what it means to have ``events'' in that context. 
+Furthermore, the notion of $p(\Omega|d_i)$ will likely be somewhat complicated, although it may be reasonable to assume a fixed point-spread-function for each pixel.
+Out likelihood also assumes that rates are low enough that the expected count above threshold in our detectors within some small time window is much less than 1.
+Depending on how CMB detectors read out their data, this may be violated and we may need a more complicated likelihood that more accurately describes the detector response.
 
 %-------------------------------------------------
 \end{document}
