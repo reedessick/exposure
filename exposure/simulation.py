@@ -109,7 +109,8 @@ def geo_position2geo_skymap(
 
     ### generate time-of-arrivals based on Gaussian distribs
     ### compute the likelihood after marginalizing over the time-of-arrival at geocenter
-    ### logL = -0.5*sum( (ti - (tg + n*r))**2/error**2 )  --> and then marginalize over tg
+    ### logL = -0.5*sum( (t_i - (tg + n*r_i))**2/error_i**2 )  --> and then marginalize over tg
+    ### marg logL = -0.5*sum((t_i-n*r_i)**2/error_i**2) + 0.5*(sum((t_i-n*r_i)/error_i**2))**2/sum(error_i**2)
 
     aprefact = 1./time_error**2
     a = np.zeros_like(map_theta, dtype=float)
