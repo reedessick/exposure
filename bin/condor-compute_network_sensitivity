@@ -12,9 +12,10 @@ import getpass
 
 from collections import defaultdict
 
-import exposureUtils as utils
-
 from optparse import OptionParser
+
+### non-standard libraries
+import exposureUtils as utils
 
 #-------------------------------------------------
 

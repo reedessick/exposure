@@ -8,13 +8,14 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 
 import os
 
-import exposureUtils as utils
-
 import getpass ### for default accounting_group_user
 
 import subprocess as sp
 
 from optparse import OptionParser
+
+### non-standard libraries
+import exposureUtils as utils
 
 #-------------------------------------------------
 

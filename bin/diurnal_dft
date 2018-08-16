@@ -10,8 +10,6 @@ import os
 import gzip
 
 import numpy as np
-import exposureUtils as utils
-import dft
 
 import matplotlib
 matplotlib.use("Agg")
@@ -19,6 +17,10 @@ from matplotlib import pyplot as plt
 plt.rcParams['text.usetex'] = True
 
 from optparse import OptionParser
+
+### non-standard libraries
+import exposureUtils as utils
+import dft
 
 #-------------------------------------------------
 
@@ -46,12 +48,12 @@ parser.add_option("", "--exclude-flag", default=[], type='string', action='appen
     help='the same as --include-flag, except we only retain times that are \
 outside of these flags instead of inside them')
 
-parser.add_option('', '--srate', default=1, type='float',
+parser.add_option('', '--srate', default=dft.DEFAULT_SRATE, type='float',
     help='sample rate used to discretize segments into time-series for DFT. \
-DEFAULT=1')
-parser.add_option('', '--tukey-alpha', default=0.0, type='float',
+DEFAULT=%.3f'%dft.DEFAULT_SRATE)
+parser.add_option('', '--tukey-alpha', default=dft.DEFAULT_TUKEY_ALPHA, type='float',
     help='the tukey alpha value used to window segments. \
-DEFAULT=0.0')
+DEFAULT=%.3f'%dft.DEFAULT_TUKEY_ALPHA)
 
 parser.add_option('', '--time-unit', default='second', type='string',
     help='the time unit used for plotting. Can be one of %s. \

@@ -19,11 +19,12 @@ plt.rcParams['text.usetex'] = True
 
 import corner #### FIXME: do I really want this dependency?
 
-import exposureUtils as utils
-
 from collections import defaultdict
 
 from optparse import OptionParser
+
+### non-standard libraries
+import exposureUtils as utils
 
 #-------------------------------------------------
 

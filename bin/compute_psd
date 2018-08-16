@@ -10,13 +10,13 @@ import os
 
 import gzip
 
-import exposureUtils as utils
-
-import dft
-
 import subprocess as sp
 
 from optparse import OptionParser
+
+### non-standard libraries
+import exposureUtils as utils
+import dft
 
 #-------------------------------------------------
 
@@ -33,17 +33,17 @@ parser.add_option("", "--exclude-flag", default=[], type='string', action='appen
     help='the same as --include-flag, except we only retain times that are \
 outside of these flags instead of inside them')
 
-parser.add_option("", "--seglen", default=4, type='int',
+parser.add_option("", "--seglen", default=dft.DEFAULT_SEGLEN, type='int',
     help='the length of segments used to estimate the PSD via an averaging procedure (specify in seconds). \
 NOTE: if we do not obtain an integer number of segments based on --seglen, --overlap, gpsstart, and gpsstop, \
-we will raise a ValueError. DEFAULT=4')
-parser.add_option("", "--overlap", default=0, type='float',
+we will raise a ValueError. DEFAULT=%d'%dft.DEFAULT_SEGLEN)
+parser.add_option("", "--overlap", default=dft.DEFAULT_OVERLAP, type='float',
     help='the amount of time overlapped for segments used to estimate the PSD (specify in seconds). \
 NOTE: if we do not obtain an integer number of segments based on --seglen, --overlap, gpsstart, and gpsstop, \
-we will raise a ValueError. DEFAULT=0')
-parser.add_option("", "--tukey-alpha", default=0.50, type='float',
+we will raise a ValueError. DEFAULT=%.3f'%dft.DEFAULT_OVERLAP)
+parser.add_option("", "--tukey-alpha", default=dft.DEFAULT_TUKEY_ALPHA, type='float',
     help='the Tukey "alpha" value used for windowing the DFT. \
-DEFAULT=0.50')
+DEFAULT=%.3f'%dft.DEFAULT_TUKEY_ALPHA)
 
 parser.add_option("-o", "--output-dir", default='.', type='string')
 parser.add_option("-t", "--tag", default="", type='string')

@@ -12,10 +12,11 @@ import subprocess as sp
 
 from collections import defaultdict
 
+from optparse import OptionParser
+
+### non-standard libraries
 import exposureUtils as utils
 import detector_cache
-
-from optparse import OptionParser
 
 #-------------------------------------------------
 

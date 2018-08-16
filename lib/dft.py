@@ -3,6 +3,16 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 
 import numpy as np
 
+#-------------------------------------------------
+
+DEFAULT_SRATE = 1. ### Hz
+DEFAULT_DT = 1./DEFAULT_SRATE ### sec
+DEFAULT_SEGLEN = 4 ### sec
+
+DEFAULT_NUM_SEGS = 1.
+DEFAULT_OVERLAP = 0.
+DEFAULT_TUKEY_ALPHA = 0.50
+
 #=================================================
 # windowing functions
 #=================================================
@@ -30,7 +40,7 @@ def window(vec, kind="kaiser", **kwargs):
         else:
                 raise ValueError, "kind=%s not understood"%kind
 
-def tukey(N, alpha):
+def tukey(N, alpha=DEFAULT_TUKEY_ALPHA):
         """
         generate a tukey window
 
@@ -65,7 +75,7 @@ def tukey(N, alpha):
 # DFT utilities
 #=================================================
 ###
-def dft(vec, dt=1.0):
+def dft(vec, dt=DEFAULT_DT):
         """
         computes the DFT of vec
         returns the one-sides spectrum
@@ -80,7 +90,7 @@ def dft(vec, dt=1.0):
 
         return np.fft.fftshift(dft_vec)[truth], freqs[truth]
 
-def idft(dft_vec, dt=1.0):
+def idft(dft_vec, dt=DEFAULT_DT):
         """
         computes the inverse DFT of vec
         takes in the one-sided spectrum
@@ -181,7 +191,7 @@ def __resample_lowpass(vec, dt, new_dt):
 #=================================================
 # PSD utilities
 #=================================================
-def estimate_psd(vec, num_segs=1, overlap=0, dt=1.0, tukey_alpha=0.1):
+def estimate_psd(vec, num_segs=DEFAULT_NUM_SEGS, overlap=DEFAULT_OVERLAP, dt=DEFAULT_DT, tukey_alpha=DEFAULT_TUKEY_ALPHA):
         """
         estimates the PSD using a DFT
         divides vec into "num_segs" with a fractional overlap of "overlap" between neighbors
