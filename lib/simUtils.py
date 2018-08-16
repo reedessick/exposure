@@ -145,8 +145,35 @@ def simulate_geo_skymaps(
     ### iterate over simulated times, generating a skymap for each, rotate it to celestial coords
     return [(time, geo_position2geo_skymap(position, (theta, phi), detectors, network, time_delay_error=time_delay_error)) for time, position in zip(draw_times(start, stop, size=size), draw_positions(theta, phi, network, size=size))]
 
-def simulate_cel_skymaps(*args, **kwargs):
+def simulate_cel_skymaps(
+        start,
+        stop,
+        detectors,
+        size=DEFAULT_SIZE,
+        nside=DEFAULT_NSIDE,
+        snr_threshold=DEFAULT_SNR_THRESHOLD,
+        flow=DEFAULT_FLOW,
+        fhigh=DEFAULT_FHIGH,
+        time_delay_error=DEFAULT_TIME_DELAY_ERROR,
+    ):
     """
     the whole kit-and-kaboodle. Delegates to simulate_geo_skymaps and then rotates the results into celestial coordinates
+    more expensive than geo_skymaps because we have to re-compute network for each event...
     """
-    return [(time, triangulate.rotateMapE2C(skymap, time)) for time, skymap in simulate_geo_skymaps(*args, **kwargs)]
+    ### figure out network antenna pattern in geographic coordinages
+    npix = hp.nside2npix(nside)
+    theta, ra = hp.pix2ang(nside, np.arange(npix))
+    psi = np.zeros_like(theta, dtype='int')
+
+    horizons = detectors2horizons(detectors, snr_threshold=snr_threshold, flow=flow, fhigh=fhigh) ### compute horizons
+
+    skymaps = []
+    for time in draw_times(start, stop, size=size):
+        phi = triangulate.rotateRAC2E(ra, time)
+        network = horizons2geo_antenna(horizons, theta, phi, psi) ### compute network sensitivity
+        network = network**3 ### weight by volume, not range
+
+        position = draw_positions(theta, phi, network, size=1)[0]
+        skymaps.append( (time, geo_position2geo_skymap(position, (theta, phi), detectors, network, time_delay_error=time_delay_error)) )
+
+    return skymaps
