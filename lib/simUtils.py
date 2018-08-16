@@ -18,7 +18,7 @@ DEFAULT_SNR_THRESHOLD = 8.
 DEFAULT_FLOW = 32. ### Hz
 DEFAULT_FHIGH = 1024. ### Hz
 
-TIME_DELAY_ERROR = 1.e-3 ### sec
+DEFAULT_TIME_DELAY_ERROR = 1.e-3 ### sec
 
 #-------------------------------------------------
 
@@ -26,14 +26,15 @@ def draw_times(start, stop, size=DEFAULT_SIZE):
     """
     draw size random times within [start, stop)
     """
-    return start + (stop-start)*np.random.rand(size)
+    ans = start + (stop-start)*np.random.rand(size)
+    return ans[ans.argsort()]
 
 #-------------------------------------------------
 
 def horizon2geo_antenna(detector, horizon, theta, phi, psi):
     return horizons2geo_antenna([(detector, horizon)], theta, phi, psi)[0]
 
-def hoirzons2geo_antenna(horizons, theta, phi, psi):
+def horizons2geo_antenna(horizons, theta, phi, psi):
     """
     compute antenna patterns in geographic coordinates cooresponding to detectors
     horizons = [(detector, horizon), (detector, horizon), ...]
@@ -63,7 +64,7 @@ def detector2horizon(detector, snr_threshold=DEFAULT_SNR_THRESHOLD, flow=DEFAULT
     a janky way of estimating the detector horizon.
     THIS COULD BE GREATLY IMPROVED
     """
-    freq = detector.psd.get_freq()
+    freq = detector.psd.get_freqs()
     psd = detector.psd.get_psd()
     truth = (flow<=freq)*(freq<=fhigh)
 
@@ -75,11 +76,11 @@ def detector2horizon(detector, snr_threshold=DEFAULT_SNR_THRESHOLD, flow=DEFAULT
     ### compute the horizon from this
     horizon = snr/snr_threshold ### this is the scaling, again making some broad approximations
 
-    return horizons
+    return horizon
 
 #-------------------------------------------------
 
-def draw_position(theta, phi, network, size=DEFAULT_SIZE):
+def draw_positions(theta, phi, network, size=DEFAULT_SIZE):
     order = network.argsort()
     args = np.random.randint(0, high=len(theta), size=size)
     return zip(theta[args], phi[args])
@@ -101,7 +102,7 @@ def geo_position2geo_skymap(
     map_n = hp.ang2vec(map_theta, map_phi)
 
     prefact = 0.5/time_delay_error**2
-    for ind, d1 in detectors:
+    for ind, d1 in enumerate(detectors):
         r1 = d1.dr
         for d2 in detectors[ind+1:]:
             dr = r1-d2.dr
@@ -124,7 +125,7 @@ def simulate_geo_skymaps(
         detectors,
         size=DEFAULT_SIZE,
         nside=DEFAULT_NSIDE,
-        snr_threshold=DEFAULT_SNR_THRSHOLD,
+        snr_threshold=DEFAULT_SNR_THRESHOLD,
         flow=DEFAULT_FLOW,
         fhigh=DEFAULT_FHIGH,
         time_delay_error=DEFAULT_TIME_DELAY_ERROR,
@@ -138,7 +139,7 @@ def simulate_geo_skymaps(
     psi = np.zeros_like(theta, dtype='int')
 
     horizons = detectors2horizons(detectors, snr_threshold=snr_threshold, flow=flow, fhigh=fhigh) ### compute horizons
-    network = detectors2geo_anteanna(horizons, theta, phi, psi) ### compute network sensitivity
+    network = horizons2geo_antenna(horizons, theta, phi, psi) ### compute network sensitivity
     network = network**3 ### weight by volume, not range
 
     ### iterate over simulated times, generating a skymap for each, rotate it to celestial coords
@@ -148,4 +149,4 @@ def simulate_cel_skymaps(*args, **kwargs):
     """
     the whole kit-and-kaboodle. Delegates to simulate_geo_skymaps and then rotates the results into celestial coordinates
     """
-    return [(time, triangulate.rotateMapE2C(skymap, time)) for time, skymap in sim_geo_skymaps(*args, **kwargs)]
+    return [(time, triangulate.rotateMapE2C(skymap, time)) for time, skymap in simulate_geo_skymaps(*args, **kwargs)]
