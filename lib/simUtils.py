@@ -11,6 +11,8 @@ import triangulate
 
 #-------------------------------------------------
 
+PI_2 = np.pi*0.5
+
 DEFAULT_SIZE = 100
 DEFAULT_NSIDE = 64
 
@@ -18,9 +20,14 @@ DEFAULT_SNR_THRESHOLD = 8.
 DEFAULT_FLOW = 32. ### Hz
 DEFAULT_FHIGH = 1024. ### Hz
 
-DEFAULT_TIME_DELAY_ERROR = 1.e-3 ### sec
+DEFAULT_TIME_ERROR = 1.e-4 ### sec
 
 #-------------------------------------------------
+
+def time2sec_ns(time):
+    sec = int(time)
+    ns = int(round((time-sec)*1e9, 0))
+    return sec, ns
 
 def draw_times(start, stop, size=DEFAULT_SIZE):
     """
@@ -90,28 +97,37 @@ def geo_position2geo_skymap(
         (map_theta, map_phi),
         detectors,
         network,
-        time_delay_error=DEFAULT_TIME_DELAY_ERROR,
+        time_error=DEFAULT_TIME_ERROR,
     ):
     """
     compute modulated triangulation rings given the detectors and network (antenna pattern)
     """
-    logskymap = np.zeros_like(map_theta, dtype=float)
-
     ### add in triangulation rings
     source_n = hp.ang2vec(source_theta, source_phi)
     map_n = hp.ang2vec(map_theta, map_phi)
 
-    prefact = 0.5/time_delay_error**2
-    for ind, d1 in enumerate(detectors):
-        r1 = d1.dr
-        for d2 in detectors[ind+1:]:
-            dr = r1-d2.dr
-            source_dt = np.sum(source_n*dr)
-            map_dt = np.sum(map_n*dr, axis=1)
+    ### generate time-of-arrivals based on Gaussian distribs
+    ### compute the likelihood after marginalizing over the time-of-arrival at geocenter
+    ### logL = -0.5*sum( (ti - (tg + n*r))**2/error**2 )  --> and then marginalize over tg
 
-            logskymap -= prefact*(source_dt-map_dt)**2 ### assume Gaussian in time-delay errors
+    aprefact = 1./time_error**2
+    a = np.zeros_like(map_theta, dtype=float)
 
-    logskymap += np.log(network) ### multiply by antenna patterns to modulate triangulation rings
+    bprefact = 0.5/time_error**2
+    b = np.zeros_like(map_theta, dtype=float)
+
+    for detector in detectors:
+        time = np.sum(source_n*detector.dr)+np.random.randn()*time_error
+        map_time = np.sum(map_n*detector.dr, axis=1)
+
+        a += aprefact*(time - map_time)
+        b -= bprefact*(time - map_time)**2
+
+    ### construct skymap as the sum of its parts
+    logskymap = +0.5*(a**2)/(len(detectors)*aprefact) + b
+
+    ### multiply by antenna patterns to modulate triangulation rings
+    logskymap += np.log(network)
 
     ### return a normalized skymap
     logskymap -= np.max(logskymap)
@@ -128,7 +144,7 @@ def simulate_geo_skymaps(
         snr_threshold=DEFAULT_SNR_THRESHOLD,
         flow=DEFAULT_FLOW,
         fhigh=DEFAULT_FHIGH,
-        time_delay_error=DEFAULT_TIME_DELAY_ERROR,
+        time_error=DEFAULT_TIME_ERROR,
     ):
     """
     the whole kit-and-kaboodle
@@ -142,8 +158,24 @@ def simulate_geo_skymaps(
     network = horizons2geo_antenna(horizons, theta, phi, psi) ### compute network sensitivity
     network = network**3 ### weight by volume, not range
 
+    ifos = [detector.name for detector in detectors]
+
     ### iterate over simulated times, generating a skymap for each, rotate it to celestial coords
-    return [(time, geo_position2geo_skymap(position, (theta, phi), detectors, network, time_delay_error=time_delay_error)) for time, position in zip(draw_times(start, stop, size=size), draw_positions(theta, phi, network, size=size))]
+    skymaps = []
+    for time, (_theta, _phi) in zip(draw_times(start, stop, size=size), draw_positions(theta, phi, network, size=size)):
+        sec, ns = time2sec_ns(time)
+        head = {
+            'gps_sec':sec,
+            'gps_nsec':ns,
+            'theta':_theta,
+            'phi':_phi,
+            'dec':PI_2 - _theta,
+            'ra':triangulate.rotateRAE2C(_phi, time),
+            'ifos':ifos,
+        }
+        skymaps.append( (head, geo_position2geo_skymap((_theta, _phi), (theta, phi), detectors, network, time_error=time_error)) )
+
+    return skymaps
 
 def simulate_cel_skymaps(
         start,
@@ -154,7 +186,7 @@ def simulate_cel_skymaps(
         snr_threshold=DEFAULT_SNR_THRESHOLD,
         flow=DEFAULT_FLOW,
         fhigh=DEFAULT_FHIGH,
-        time_delay_error=DEFAULT_TIME_DELAY_ERROR,
+        time_error=DEFAULT_TIME_ERROR,
     ):
     """
     the whole kit-and-kaboodle. Delegates to simulate_geo_skymaps and then rotates the results into celestial coordinates
@@ -167,13 +199,25 @@ def simulate_cel_skymaps(
 
     horizons = detectors2horizons(detectors, snr_threshold=snr_threshold, flow=flow, fhigh=fhigh) ### compute horizons
 
+    ifos = [detector.name for detector in detectors]
+
     skymaps = []
     for time in draw_times(start, stop, size=size):
         phi = triangulate.rotateRAC2E(ra, time)
         network = horizons2geo_antenna(horizons, theta, phi, psi) ### compute network sensitivity
         network = network**3 ### weight by volume, not range
 
-        position = draw_positions(theta, phi, network, size=1)[0]
-        skymaps.append( (time, geo_position2geo_skymap(position, (theta, phi), detectors, network, time_delay_error=time_delay_error)) )
+        _theta, _phi = draw_positions(theta, phi, network, size=1)[0]
+        sec, ns = time2sec_ns(time)
+        head = {
+            'gps_sec':sec,
+            'gps_nsec':ns,
+            'theta':_theta,
+            'phi':_phi,
+            'dec':PI_2 - _theta,
+            'ra':triangulate.rotateRAE2C(_phi, time),
+            'ifos':ifos,
+        }
+        skymaps.append( (head, geo_position2geo_skymap((_theta, _phi), (theta, phi), detectors, network, time_error=time_error)) )
 
     return skymaps

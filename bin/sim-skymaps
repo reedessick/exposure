@@ -4,7 +4,7 @@ __usage__ = "sim-skymaps [--options] gps_start gps_stop"
 __doc__ = """\
 a simple script for generating simulated skymaps using quasi-realistic detectors.
 NOTE:
-    we ignore the relative sensitivity of detectors, which would affect the time-delay-errors via signal bandwidth and snr, etc. This should be corrected in the future."""
+    we ignore the relative sensitivity of detectors, which would affect the time-of-arrival via signal bandwidth and snr, etc. This should be corrected in the future."""
 __author__ = "reed.essick@ligo.org"
 
 #-------------------------------------------------
@@ -38,9 +38,9 @@ parser.add_option('-n', '--num-events', default=simUtils.DEFAULT_SIZE, type='int
 
 parser.add_option('--coord', default=DEFAULT_COORD, type='string',
     help='either E or C. DEFAULT='+DEFAULT_COORD)
-parser.add_option('--time-delay-error', default=simUtils.DEFAULT_TIME_DELAY_ERROR, type='float',
-    help='standard deviation for a Gaussian for time-delay error specified in seconds. \
-DEFAULT=%.3e'%simUtils.DEFAULT_TIME_DELAY_ERROR)
+parser.add_option('--time-error', default=simUtils.DEFAULT_TIME_ERROR, type='float',
+    help='standard deviation for a Gaussian for time-of-arrival error specified in seconds. \
+DEFAULT=%.3e'%simUtils.DEFAULT_TIME_ERROR)
 parser.add_option('--nside', default=simUtils.DEFAULT_NSIDE, type='int',
     help='DEFAULT=%d'%simUtils.DEFAULT_NSIDE)
 
@@ -64,7 +64,6 @@ opts.verbose |= opts.Verbose
 
 ### extract detectors
 detectors = [detector_cache.detectors[ifo] for ifo in opts.ifo]
-ifos = ','.join(opts.ifo) ### used for FITS headers
 
 #-------------------------------------------------
 
@@ -75,14 +74,21 @@ args = gps_start, gps_stop, detectors
 kwargs = {
     'size':opts.num_events,
     'nside':opts.nside,
-    'time_delay_error':opts.time_delay_error,
+    'time_error':opts.time_error,
 }
 skymaps = simUtils.simulate_cel_skymaps(*args, **kwargs) if opts.coord=='C' \
     else simUtils.simulate_geo_skymaps(*args, **kwargs)
-for time, skymap in skymaps:
-    sec = int(time)
-    ns = (time-sec)*1e9
-    path = template%(sec, ns)
+for head, skymap in skymaps:
+    path = template%(head['gps_sec'], head['gps_nsec'])
     if opts.Verbose:
         print('    saving: '+path)
-    hp.write_map(path, skymap, coord=opts.coord, extra_header=[('GPS', '%.9f'%time), ('IFOS', ifos)])
+    header = [
+        ('GPS_SEC', head['gps_sec']),
+        ('GPS_NSEC', head['gps_nsec']),
+        ('THETA', head['theta']),
+        ('PHI', head['phi']),
+        ('DEC', head['dec']),
+        ('RA', head['ra']),
+        ('IFOS', ','.join(head['ifos'])),
+    ]
+    hp.write_map(path, skymap, coord=opts.coord, extra_header=header)
