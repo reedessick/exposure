@@ -21,6 +21,7 @@ DEFAULT_FLOW = 32. ### Hz
 DEFAULT_FHIGH = 1024. ### Hz
 
 DEFAULT_TIME_ERROR = 1.e-4 ### sec
+DEFAULT_SEGLEN = 15. ### sec
 
 #-------------------------------------------------
 
@@ -135,6 +136,77 @@ def geo_position2geo_skymap(
 
 #-------------------------------------------------
 
+def simulate_geo_exposure(
+        start,
+        stop,
+        detectors,
+        nside=DEFAULT_NSIDE,
+        snr_threshold=DEFAULT_SNR_THRESHOLD,
+        flow=DEFAULT_FLOW,
+        fhigh=DEFAULT_FHIGH,
+    ):
+    """
+    simulate exposure in geographic coordinates
+    Note, we ignore start, stop when actually calculculating exposure because
+        the antenna patterns are simulated as stationary in this frame (stationary PSDs)
+    """
+    npix = hp.nside2npix(nside)
+    theta, phi = hp.pix2ang(nside, np.arange(npix))
+    psi = np.zeros_like(theta, dtype='int')
+
+    horizons = detectors2horizons(detectors, snr_threshold=snr_threshold, flow=flow, fhigh=fhigh)
+    network = horizons2geo_antenna(horizons, theta, phi, psi)
+    network = network **3 ### weight by volume, not range
+    network *= (stop-start) ### weight by time
+
+    start_sec, start_ns = time2sec_ns(start)
+    stop_sec, stop_ns = time2sec_ns(stop)
+
+    head = {
+        'gps_start_sec':start_sec,
+        'gps_start_nsec':start_ns,
+        'gps_stop_sec':stop_sec,
+        'gps_stop_nsec':stop_ns,
+        'ifos':[detector.name for detector in detectors],
+    }
+    return head, network
+
+def simulate_cel_exposure(
+        start,
+        stop,
+        detectors,
+        nside=DEFAULT_NSIDE,
+        snr_threshold=DEFAULT_SNR_THRESHOLD,
+        flow=DEFAULT_FLOW,
+        fhigh=DEFAULT_FHIGH,
+        seglen=DEFAULT_SEGLEN
+    ):
+    """
+    simulate the exposure in celestial coordinates
+    more expensive than simulate_geo_exposure because we re-compute antenna patterns at each time-step
+
+    NOTE: this does NOT account for leap-seconds
+    """
+    npix = hp.nside2npix(nside)
+    theta, ra = hp.pix2ang(nside, np.arange(npix))
+    psi = np.zeros_like(theta, dtype='int')
+
+    horizons = detectors2horizons(detectors, snr_threshold=snr_threshold, flow=flow, fhigh=fhigh)
+
+    exposure = np.zeros(npix, dtype=float)
+    while start < stop:
+        dt = min(stop, start+seglen) - start
+        t = 0.5*dt + start
+
+        network = horizons2geo_antenna(horizons, theta, triangulate.rotateRAC2E(ra, t), psi)
+        network = network**3 ### weigh by volume
+        network *= dt ### weigh by time
+
+        exposure += network
+        start += dt
+
+    return head, exposure
+
 def simulate_geo_skymaps(
         start,
         stop,
@@ -191,6 +263,8 @@ def simulate_cel_skymaps(
     """
     the whole kit-and-kaboodle. Delegates to simulate_geo_skymaps and then rotates the results into celestial coordinates
     more expensive than geo_skymaps because we have to re-compute network for each event...
+
+    NOTE: this does NOT account for leap-seconds
     """
     ### figure out network antenna pattern in geographic coordinages
     npix = hp.nside2npix(nside)
