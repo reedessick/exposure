@@ -4,7 +4,7 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 #-------------------------------------------------
 
 import numpy as np
-from pylal import Fr
+from lalframe import frread
 
 import subprocess as sp
 
@@ -191,8 +191,9 @@ def vec_from_frames(frames, channel, start, stop, verbose=False):
                     print( frame )
                 s = max(frame_start, start)
                 d = min(frame_start+frame_dur,stop) - s
-                vec, gpstart, offset, dt, _, _ = Fr.frgetvect1d(frame, channel, start=s, span=d)
-                vecs.append( vec )
+                out = frread.read_timeseries(frame, channel, start=s, duration=d)
+                vecs.append( out.data.data )
+                dt = out.deltaT
         vec = np.concatenate(vecs)
         return vec, dt
 

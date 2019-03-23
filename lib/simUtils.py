@@ -21,7 +21,7 @@ DEFAULT_FLOW = 32. ### Hz
 DEFAULT_FHIGH = 1024. ### Hz
 
 DEFAULT_TIME_ERROR = 1.e-4 ### sec
-DEFAULT_SEGLEN = 15. ### sec
+DEFAULT_SEGLEN = 600. ### sec
 
 #-------------------------------------------------
 
@@ -205,6 +205,16 @@ def simulate_cel_exposure(
         exposure += network
         start += dt
 
+    start_sec, start_ns = time2sec_ns(start)
+    stop_sec, stop_ns = time2sec_ns(stop)
+
+    head = {
+        'gps_start_sec':start_sec,
+        'gps_start_nsec':start_ns,
+        'gps_stop_sec':stop_sec,
+        'gps_stop_nsec':stop_ns,
+        'ifos':[detector.name for detector in detectors],
+    }
     return head, exposure
 
 def simulate_geo_skymaps(

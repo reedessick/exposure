@@ -11,6 +11,7 @@ __author__ = "reed.essick@ligo.org"
 
 import os
 
+import numpy as np
 import healpy as hp
 
 from optparse import OptionParser
@@ -37,6 +38,10 @@ parser.add_option('--coord', default=DEFAULT_COORD, type='string',
     help='either E or C. DEFAULT='+DEFAULT_COORD)
 parser.add_option('--nside', default=simUtils.DEFAULT_NSIDE, type='int',
     help='DEFAULT=%d'%simUtils.DEFAULT_NSIDE)
+parser.add_option('--C-uniform', default=False, action='store_true',
+    help='analytically marginalize away any dependence on RA over \
+time regardless of how long we actually specify the exposure. Only \
+takes effect when specified with --coord=C')
 
 parser.add_option('-o', '--output-dir', default='.', type='string')
 parser.add_option('-t', '--tag', default='', type='string')
@@ -65,16 +70,29 @@ args = gps_start, gps_stop, detectors
 kwargs = {
     'nside':opts.nside,
 }
-head, exposure = simUtils.simulate_cel_exposure(*args, **kwargs) if opts.coord=='C' \
-    else simUtils.simulate_geo_exposure(*args, **kwargs)
+if (opts.coord=='E') or opts.C_uniform:
+    head, exposure = simUtils.simulate_geo_exposure(*args, **kwargs)
+
+    if (opts.coord=='C') and opts.C_uniform:
+        if opts.verbose:
+            print('analytically marginalizing over RA')
+        theta, _ = hp.pix2ang(opts.nside, np.arange(hp.nside2npix(opts.nside)))
+        truth = np.zeros_like(theta, dtype=bool)
+        for t in sorted(set(theta)):
+            truth[:] = theta==t 
+            exposure[truth] = np.mean(exposure[truth])
+
+else:
+    head, exposure = simUtils.simulate_cel_exposure(*args, **kwargs)
+
 path = "%s/sim-exposure%s-%d-%d.fits.gz"%(opts.output_dir, opts.tag, gps_start, gps_stop-gps_start)
 if opts.verbose:
     print('saving: '+path)
 header = [
-    ('GPS_START_SEC', head['gps_start_sec']),
-    ('GPS_START_NSEC', head['gps_start_nsec']),
-    ('GPS_STOP_SEC', head['gps_stop_sec']),
-    ('GPS_STOP_NSEC', head['gps_stop_nsec']),
+    ('START_S', head['gps_start_sec']),
+    ('START_NS', head['gps_start_nsec']),
+    ('STOP_S', head['gps_stop_sec']),
+    ('STOP_NS', head['gps_stop_nsec']),
     ('IFOS', ','.join(head['ifos'])),
 ]
 hp.write_map(path, exposure, coord=opts.coord, extra_header=header)
