@@ -3,12 +3,31 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 
 #-------------------------------------------------
 
+import time
+
 import subprocess as sp
 
 ### non-standard libraries
 from lalframe import frread
+from lal.gpstime import tconvert
 
 from . import utils
+
+#-------------------------------------------------
+
+DEFAULT_STRIDE = 60
+DEFAULT_DELAY = 0
+DEFAULT_MAX_LATENCY = 2*DEFAULT_STRIDE
+
+#-------------------------------------------------
+
+def latency(delay=DEFAULT_DELAY):
+    return tconvert('now')-delay
+
+def wait(target, delay=DEFAULT_DELAY):
+    w = latency(delay=delay) - target
+    if w > 0:
+        time.sleep(w)
 
 #-------------------------------------------------
 

@@ -3,6 +3,7 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 
 #-------------------------------------------------
 
+import gzip
 import numpy as np
 
 #-------------------------------------------------
@@ -124,6 +125,11 @@ RETRY  compute_horizon_%(jobid)s %(retry)d
 
 #-------------------------------------------------
 
+MOD_STRIDE = 100000
+
+def segs_path(output_dir, tag, gpsstart, gpsdur):
+    return "%s/seg%s-%d-%d.txt.gz"%(gps2moddir(directory, gpsstart), tag, (int(gpsstart)/MOD_STRIDE)*MOD_STRIDE, MOD_STRIDE)
+
 def psd_path(output_dir, tag, gpsstart, gpsdur):
     return "%s/psd%s-%d-%d.txt.gz"%(output_dir, tag, gpsstart, gpsdur)
 
@@ -136,13 +142,39 @@ def sensitivity_path(output_dir, tag, gps, gzip=False):
         ans = ans+".gz"
     return ans
 
+def gps2moddir(directory, start):
+    return "%s/%d/%d-%d/"%(directory, int(start)/MOD_STRIDE)
+
 def gps2dir(directory, start, dur):
-    return "%s/%d/%d-%d/"%(directory, int(start)/100000, start, dur)
+    return "%s/%d-%d/"%(gps2moddir(directory, start), start, dur)
 
 #-------------------------------------------------
 
 def extract_start_dur(path, suffix='.gwf'):
     return [int(_) for _ in path[:-len(suffix)].split('-')[-2:]]
+
+def report_psd(path, freqs, psd):
+    """writes the PSD to disk
+    """
+    np.savetxt(psdpath, np.array(zip(freqs, psd)), delimiter=' ')
+
+def report_segs(path, new_segs):
+    """reads in the segments contained in path and appends the current seg of segs to them
+    assumes you are only adding segments in time order, so it will either start a new segment or merge the last segment in the file
+    """
+    ### read in and merge segs if necessary
+    segs = np.loadtxt(path)
+    if len(segs):
+        if (segs[-1][1]==new_segs[0][0]):
+            segs[-1][1] = segs.pop(0)[1] ### remove the first element from segs
+
+        segs = list(segs)+new_segs
+
+    else:
+        segs = new_segs
+
+    ### write the result back out
+    np.savetxt(path, segs)
 
 #-------------------------------------------------
 
