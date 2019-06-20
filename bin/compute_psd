@@ -51,18 +51,12 @@ opts, args = parser.parse_args()
 assert len(args)==4, 'please supply exactly 4 arguments\n%s'%__usage__
 channel, frametype = args[:2]
 gpsstart, gpsstop = [int(_) for _ in args[2:]]
+stride = gpsstop - gpsstart
 
 assert channel[0]==frametype[0], 'I do not believe you want a channel and frametype \
 from different IFOs\n\tchannel : %s\n\tframetype : %s\n%s'%(channel, frametype, __usage__)
 
 assert opts.seglen > opts.overlap, '--seglen must be larger than --overlap\n\%s'%__usage__
-
-optDict = {
-    'gpsstart' : gpsstart,
-    'gpsstop'  : gpsstop,
-    'observatory' : channel[0],
-    'frametype' : frametype,
-}
 
 if opts.tag:
     opts.tag = "_"+opts.tag
@@ -77,8 +71,8 @@ opts.verbose |= opts.Verbose
 ### ensure we have proper coverage
 segments = [[gpsstart, gpsstop]]
 
-segments = datafind.include_flags(segments, opts.include_flag, optDict, verbose=opts.verbose)
-segments = datafind.exclude_flags(segments, opts.exclude_flag, optDict, verbose=opts.verbose)
+segments = datafind.include_flags(segments, opts.include_flag, gpsstart, stride, verbose=opts.verbose)
+segments = datafind.exclude_flags(segments, opts.exclude_flag, gpsstart, stride, verbose=opts.verbose)
 
 assert segments, 'no remaining livetime after filtering by flags!'
 assert len(segments)==1, 'more than one segment after filtering by flags!'
@@ -87,7 +81,7 @@ assert segments[0][0]==gpsstart and segments[0][1]==gpsstop, 'segments to not co
 #------------------------
 
 ### grab frames
-frames = datafind.gw_data_find(optDict, verbose=opts.verbose)
+frames = datafind.gw_data_find(channel[0], frametype, gpsstart, gpsstop-gpsstart, verbose=opts.verbose)
 
 ### insure we have full coverage
 segs = utils.andsegments(segments, utils.mergesegments([(s,s+d) for _, s, d in frames]))

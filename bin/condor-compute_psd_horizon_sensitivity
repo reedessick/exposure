@@ -121,6 +121,7 @@ opts, args = parser.parse_args()
 
 assert len(args)==2, 'please supply exactly 2 arguments\n%s'%__usage__
 gpsstart, gpsstop = [int(_) for _ in args]
+stride = gpsstop - gpsstart
 
 assert opts.seglen > opts.overlap, '--seglen must be larger than --overlap\n\%s'%__usage__
 
@@ -166,15 +167,9 @@ dag = open(dagname, 'w')
 ### figure out segments
 segsdict = dict()
 for ifo, channel, frametype in opts.ifo_specs:
-    optDict = {
-        'gpsstart' : gpsstart,
-        'gpsstop'  : gpsstop,
-        'observatory' : channel[0],
-        'frametype' : frametype,
-    }
     segsdict[ifo] = [[gpsstart, gpsstop]]
-    segsdict[ifo] = datafind.include_flags(segsdict[ifo], include_flag[ifo], optDict, verbose=opts.verbose)
-    segsdict[ifo] = datafind.exclude_flags(segsdict[ifo], exclude_flag[ifo], optDict, verbose=opts.verbose)
+    segsdict[ifo] = datafind.include_flags(segsdict[ifo], include_flag[ifo], start, stride, verbose=opts.verbose)
+    segsdict[ifo] = datafind.exclude_flags(segsdict[ifo], exclude_flag[ifo], start, stride, verbose=opts.verbose)
     
 if opts.joint_lock_only:
     segments = [[gpsstart, gpsstop]]

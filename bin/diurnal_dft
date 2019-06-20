@@ -71,6 +71,7 @@ parser.add_option('', '--figtype', default=[], type='string', action='append')
 opts, args = parser.parse_args()
 assert len(args)==2, 'please supply exactly 2 input arguments\n%s'%__usage__
 gpsstart, gpsstop = [float(_) for _ in args]
+stride = gpsstop - gpsstart
 
 if opts.tag:
     opts.tag = "_"+opts.tag
@@ -81,18 +82,13 @@ if not os.path.exists(opts.output_dir):
 if not opts.figtype:
     opts.figtype.append( 'png' )
 
-optDict = {
-    'gpsstart' : gpsstart,
-    'gpsstop'  : gpsstop,
-}
-
 #-------------------------------------------------
 
 ### go find segment data
 segments = [[gpsstart, gpsstop]]
 
-segments = datafind.include_flags(segments, opts.include_flag, optDict, verbose=opts.verbose)
-segments = datafind.exclude_flags(segments, opts.exclude_flag, optDict, verbose=opts.verbose)
+segments = datafind.include_flags(segments, opts.include_flag, start, stride, verbose=opts.verbose)
+segments = datafind.exclude_flags(segments, opts.exclude_flag, start, stride, verbose=opts.verbose)
 
 assert segments, 'no remaining livetime after filtering by flags!'
 
