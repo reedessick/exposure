@@ -202,3 +202,27 @@ def mergesegments(segments):
             e = E
     segs.append( [s, e] )
     return segs
+
+def checksegments(seg, window=None):
+    """
+    ensures segment makes sense
+    if provided, segment is sliced so that we only keep the part that interesects with window=[start, end]
+    """
+    s, e = seg 
+    if window:
+        start, end = window
+        if s < start:
+            s = start # truncate the start of seg
+        elif not (s < end):
+            return False # no overlap between current segment and window
+        if e > end:
+            e = end # truncate the end of seg
+        elif not (e > start):
+            return False # no overlap between currnet segment and window
+
+    if s < e:
+        return [s,e]
+    elif s > e:
+        raise ValueError("something is very wrong with segment generation... seg[1]=%.3f < seg[0]=%.3f"%tuple(seg))
+    else:
+        return False
