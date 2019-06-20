@@ -15,11 +15,11 @@ import healpy as hp
 from optparse import OptionParser
 
 ### non-standard libraries
-import exposureUtils as utils
+import utils as utils
 
 import detector_cache ### FIXME: call out this dependency in README
 import triangulate ### FIXME: call out this dependency in README
-import simUtils
+import simulation
 
 #-------------------------------------------------
 
@@ -32,7 +32,7 @@ parser.add_option('', '--ifo-horizon', nargs=2, default=[], type='string', actio
     help='specify which IFOs to include and paths to their range files as, e.g.: H1 path/to/horizon.txt.gz \
 DEFAULT=[]')
 
-parser.add_option('', '--nside', default=simUtils.DEFAULT_NSIDE, type='int', 
+parser.add_option('', '--nside', default=simulation.DEFAULT_NSIDE, type='int', 
     help='the NSIDE resolution for the resulting FITS files')
 
 parser.add_option('-o', '--output-dir', default='.', type='string')
@@ -76,7 +76,7 @@ for gps in args:
         print( 'gps=%.3f'%gps )
     phi = triangulate.rotateRAC2E(ra, gps) ### find the corresponding positions in Geographic coordinates
 
-    network = simUtils.detectors2antenna(horizons, theta, phi, psi)
+    network = simulation.detectors2antenna(horizons, theta, phi, psi)
 
     path = utils.sensitivity_path(opts.output_dir, opts.tag, gps, gzip=False)
     if opts.verbose:

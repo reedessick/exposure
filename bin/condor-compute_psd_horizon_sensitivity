@@ -15,7 +15,7 @@ from collections import defaultdict
 from optparse import OptionParser
 
 ### non-standard libraries
-import exposureUtils as utils
+import utils as utils
 import detector_cache
 
 #-------------------------------------------------

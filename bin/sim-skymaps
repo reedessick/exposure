@@ -16,7 +16,7 @@ import healpy as hp
 from optparse import OptionParser
 
 ### non-standard libraries
-import simUtils
+import simulation
 import detector_cache
 
 #-------------------------------------------------
@@ -33,16 +33,16 @@ parser.add_option('-V', '--Verbose', default=False, action='store_true')
 
 parser.add_option('-i', '--ifo', default=[], type='string', action='append',
     help='can be repeated')
-parser.add_option('-n', '--num-events', default=simUtils.DEFAULT_SIZE, type='int',
-    help='DEFAULT=%d'%simUtils.DEFAULT_SIZE)
+parser.add_option('-n', '--num-events', default=simulation.DEFAULT_SIZE, type='int',
+    help='DEFAULT=%d'%simulation.DEFAULT_SIZE)
 
 parser.add_option('--coord', default=DEFAULT_COORD, type='string',
     help='either E or C. DEFAULT='+DEFAULT_COORD)
-parser.add_option('--time-error', default=simUtils.DEFAULT_TIME_ERROR, type='float',
+parser.add_option('--time-error', default=simulation.DEFAULT_TIME_ERROR, type='float',
     help='standard deviation for a Gaussian for time-of-arrival error specified in seconds. \
-DEFAULT=%.3e'%simUtils.DEFAULT_TIME_ERROR)
-parser.add_option('--nside', default=simUtils.DEFAULT_NSIDE, type='int',
-    help='DEFAULT=%d'%simUtils.DEFAULT_NSIDE)
+DEFAULT=%.3e'%simulation.DEFAULT_TIME_ERROR)
+parser.add_option('--nside', default=simulation.DEFAULT_NSIDE, type='int',
+    help='DEFAULT=%d'%simulation.DEFAULT_NSIDE)
 
 parser.add_option('-o', '--output-dir', default='.', type='string')
 parser.add_option('-t', '--tag', default='', type='string')
@@ -76,8 +76,8 @@ kwargs = {
     'nside':opts.nside,
     'time_error':opts.time_error,
 }
-skymaps = simUtils.simulate_cel_skymaps(*args, **kwargs) if opts.coord=='C' \
-    else simUtils.simulate_geo_skymaps(*args, **kwargs)
+skymaps = simulation.simulate_cel_skymaps(*args, **kwargs) if opts.coord=='C' \
+    else simulation.simulate_geo_skymaps(*args, **kwargs)
 for head, skymap in skymaps:
     path = template%(head['gps_sec'], head['gps_nsec'])
     if opts.Verbose:

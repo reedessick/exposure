@@ -17,7 +17,7 @@ import healpy as hp
 from optparse import OptionParser
 
 ### non-standard libraries
-import simUtils
+import simulation
 import detector_cache
 
 #-------------------------------------------------
@@ -36,8 +36,8 @@ parser.add_option('-i', '--ifo', default=[], type='string', action='append',
 
 parser.add_option('--coord', default=DEFAULT_COORD, type='string',
     help='either E or C. DEFAULT='+DEFAULT_COORD)
-parser.add_option('--nside', default=simUtils.DEFAULT_NSIDE, type='int',
-    help='DEFAULT=%d'%simUtils.DEFAULT_NSIDE)
+parser.add_option('--nside', default=simulation.DEFAULT_NSIDE, type='int',
+    help='DEFAULT=%d'%simulation.DEFAULT_NSIDE)
 parser.add_option('--C-uniform', default=False, action='store_true',
     help='analytically marginalize away any dependence on RA over \
 time regardless of how long we actually specify the exposure. Only \
@@ -71,7 +71,7 @@ kwargs = {
     'nside':opts.nside,
 }
 if (opts.coord=='E') or opts.C_uniform:
-    head, exposure = simUtils.simulate_geo_exposure(*args, **kwargs)
+    head, exposure = simulation.simulate_geo_exposure(*args, **kwargs)
 
     if (opts.coord=='C') and opts.C_uniform:
         if opts.verbose:
@@ -83,7 +83,7 @@ if (opts.coord=='E') or opts.C_uniform:
             exposure[truth] = np.mean(exposure[truth])
 
 else:
-    head, exposure = simUtils.simulate_cel_exposure(*args, **kwargs)
+    head, exposure = simulation.simulate_cel_exposure(*args, **kwargs)
 
 path = "%s/sim-exposure%s-%d-%d.fits.gz"%(opts.output_dir, opts.tag, gps_start, gps_stop-gps_start)
 if opts.verbose:

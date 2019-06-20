@@ -14,7 +14,7 @@ import numpy as np
 from optparse import OptionParser
 
 ### non-standard libraries
-import simUtils
+import simulation
 import detector_cache
 
 #-------------------------------------------------
@@ -23,12 +23,12 @@ parser = OptionParser(usage=__usage__, description=__description__)
 
 parser.add_option('-v', '--verbose', default=False, action='store_true')
 
-parser.add_option('', '--flow', default=simUtils.DEFAULT_FLOW, type='float',
-    help='DEFAULT=%.3f'%simUtils.DEFAULT_FLOW)
-parser.add_option('', '--fhigh', default=simUtils.DEFAULT_FHIGH, type='float',
-    help='DEFAULT=%.3f'%simUtils.DEFAULT_FHIGH)
+parser.add_option('', '--flow', default=simulation.DEFAULT_FLOW, type='float',
+    help='DEFAULT=%.3f'%simulation.DEFAULT_FLOW)
+parser.add_option('', '--fhigh', default=simulation.DEFAULT_FHIGH, type='float',
+    help='DEFAULT=%.3f'%simulation.DEFAULT_FHIGH)
 
-parser.add_option('', '--snr-thr', default=simUtils.DEFAULT_SNR_THRESHOLD, type='float',
+parser.add_option('', '--snr-thr', default=simulation.DEFAULT_SNR_THRESHOLD, type='float',
     help='an arbitrary snr threshold defining what is detectable. Used to estimate the horizon')
 
 parser.add_option('-o', '--output-dir', default='.', type='string')
@@ -54,7 +54,7 @@ psd = detector_cache.PSD(*np.loadtxt(args[0]).transpose()) ### freq, psd
 detector = detector_cache.Detector('dummy', [0,0,0], [1,0,0], [0,1,0], psd=psd)
 
 ### compute the horizon for this detector
-horizon = simUtils.detector2horizon(detector, opts.snr_thr, flow=opts.flow, fhigh=opts.fhigh)[0][1]
+horizon = simulation.detector2horizon(detector, opts.snr_thr, flow=opts.flow, fhigh=opts.fhigh)[0][1]
 
 ### save
 path = utils.horizon_path(opts.output_dir, opts.tag, gpstart, gpsdur)

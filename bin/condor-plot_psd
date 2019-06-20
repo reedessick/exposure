@@ -10,7 +10,7 @@ import os
 
 import getpass ### for default accounting_group_user
 
-import exposureUtils as utils
+import utils as utils
 
 from optparse import OptionParser
 

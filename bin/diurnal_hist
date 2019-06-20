@@ -19,7 +19,7 @@ plt.rcParams['text.usetex'] = True
 from optparse import OptionParser
 
 ### non-standard libraries
-import exposureUtils as utils
+import utils as utils
 from lal.gpstime import tconvert
 
 #-------------------------------------------------
