@@ -17,8 +17,8 @@ import healpy as hp
 from optparse import OptionParser
 
 ### non-standard libraries
-import simulation
-import detector_cache
+from exposure import simulation
+from skymap_statitics import detector_cache
 
 #-------------------------------------------------
 

@@ -15,11 +15,11 @@ import healpy as hp
 from optparse import OptionParser
 
 ### non-standard libraries
-import utils as utils
+from exposure import
+from exposure import simulation
 
-import detector_cache ### FIXME: call out this dependency in README
-import triangulate ### FIXME: call out this dependency in README
-import simulation
+from skymap_statitics import import detector_cache
+from skymap_statitics import triangulate
 
 #-------------------------------------------------
 

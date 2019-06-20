@@ -14,8 +14,8 @@ import numpy as np
 from optparse import OptionParser
 
 ### non-standard libraries
-import simulation
-import detector_cache
+from exposure import simulation
+from skymap_statistics import detector_cache
 
 #-------------------------------------------------
 

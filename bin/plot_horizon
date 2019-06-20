@@ -7,8 +7,8 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 #-------------------------------------------------
 
 import os
-
 import gzip
+from collections import defaultdict
 
 import numpy as np
 
@@ -17,14 +17,12 @@ matplotlib.use("Agg")
 from matplotlib import pyplot as plt
 plt.rcParams['text.usetex'] = True
 
-import corner #### FIXME: do I really want this dependency?
-
-from collections import defaultdict
-
 from optparse import OptionParser
 
 ### non-standard libraries
-import utils as utils
+from exposure import utils
+
+import corner #### FIXME: do I really want this dependency?
 
 #-------------------------------------------------
 

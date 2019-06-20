@@ -7,15 +7,14 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 #-------------------------------------------------
 
 import os
-
 import getpass ### for default accounting_group_user
-
 import subprocess as sp
 
 from optparse import OptionParser
 
 ### non-standard libraries
-import utils as utils
+from exposure import utils
+from exposure import datafind
 
 #-------------------------------------------------
 
@@ -102,8 +101,8 @@ opts.verbose |= opts.Verbose
 ### ensure we have proper coverage
 segments = [[gpsstart, gpsstop]]
 
-segments = utils.include_flags(segments, opts.include_flag, optDict, verbose=opts.verbose)
-segments = utils.exclude_flags(segments, opts.exclude_flag, optDict, verbose=opts.verbose)
+segments = datafind.include_flags(segments, opts.include_flag, optDict, verbose=opts.verbose)
+segments = datafind.exclude_flags(segments, opts.exclude_flag, optDict, verbose=opts.verbose)
 
 ### check to make sure we have livetime left, etc
 assert len(segments), 'no remaining livetime after filtering by flags!'

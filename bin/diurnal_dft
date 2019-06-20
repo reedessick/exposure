@@ -19,8 +19,9 @@ plt.rcParams['text.usetex'] = True
 from optparse import OptionParser
 
 ### non-standard libraries
-import utils as utils
-import dft
+from exposure import utils
+from exposure import datafind
+from exposure import dft
 
 #-------------------------------------------------
 
@@ -90,8 +91,8 @@ optDict = {
 ### go find segment data
 segments = [[gpsstart, gpsstop]]
 
-segments = utils.include_flags(segments, opts.include_flag, optDict, verbose=opts.verbose)
-segments = utils.exclude_flags(segments, opts.exclude_flag, optDict, verbose=opts.verbose)
+segments = datafind.include_flags(segments, opts.include_flag, optDict, verbose=opts.verbose)
+segments = datafind.exclude_flags(segments, opts.exclude_flag, optDict, verbose=opts.verbose)
 
 assert segments, 'no remaining livetime after filtering by flags!'
 

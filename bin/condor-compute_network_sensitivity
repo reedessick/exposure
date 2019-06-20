@@ -7,15 +7,13 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 #-------------------------------------------------
 
 import os
-
 import getpass
-
 from collections import defaultdict
 
 from optparse import OptionParser
 
 ### non-standard libraries
-import utils as utils
+from exposure import utils
 
 #-------------------------------------------------
 

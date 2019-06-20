@@ -1,6 +1,8 @@
 __description__ = """a module that handles all dft calculations """
 __author__ = "Reed Essick (reed.essick@ligo.org)"
 
+#-------------------------------------------------
+
 import numpy as np
 
 #-------------------------------------------------

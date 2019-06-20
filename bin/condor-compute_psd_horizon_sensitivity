@@ -9,14 +9,15 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 import os
 import getpass
 import subprocess as sp
-
 from collections import defaultdict
 
 from optparse import OptionParser
 
 ### non-standard libraries
-import utils as utils
-import detector_cache
+from exposure import utils
+from exposure import datafind
+
+from skymap_statistics import detector_cache
 
 #-------------------------------------------------
 
@@ -172,8 +173,8 @@ for ifo, channel, frametype in opts.ifo_specs:
         'frametype' : frametype,
     }
     segsdict[ifo] = [[gpsstart, gpsstop]]
-    segsdict[ifo] = utils.include_flags(segsdict[ifo], include_flag[ifo], optDict, verbose=opts.verbose)
-    segsdict[ifo] = utils.exclude_flags(segsdict[ifo], exclude_flag[ifo], optDict, verbose=opts.verbose)
+    segsdict[ifo] = datafind.include_flags(segsdict[ifo], include_flag[ifo], optDict, verbose=opts.verbose)
+    segsdict[ifo] = datafind.exclude_flags(segsdict[ifo], exclude_flag[ifo], optDict, verbose=opts.verbose)
     
 if opts.joint_lock_only:
     segments = [[gpsstart, gpsstop]]

@@ -4,9 +4,6 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 #-------------------------------------------------
 
 import numpy as np
-from lalframe import frread
-
-import subprocess as sp
 
 #-------------------------------------------------
 
@@ -125,9 +122,6 @@ VARS   compute_horizon_%(jobid)s path="%(path)s" tag="%(tag)s"
 RETRY  compute_horizon_%(jobid)s %(retry)d
 '''
 
-query_cmd = "ligolw_segment_query_dqsegdb -q -t https://segments.ligo.org -a %(flag)s -s %(gpsstart)d -e %(gpsstop)d"
-print_cmd = "ligolw_print -c start_time -c end_time -t segment".split()
-
 #-------------------------------------------------
 
 def psd_path(output_dir, tag, gpsstart, gpsdur):
@@ -147,55 +141,10 @@ def gps2dir(directory, start, dur):
 
 #-------------------------------------------------
 
-def query_flag(flag, optDict, verbose=False):
-    optDict['flag'] = flag
-    cmd = query_cmd%optDict
-    if verbose:
-        print( cmd )
-    segs = sp.Popen(cmd.split(), stdout=sp.PIPE).communicate()[0]
-    return [[int(_) for _ in seg.split(',')] for seg in sp.Popen(print_cmd, stdin=sp.PIPE, stdout=sp.PIPE).communicate(segs)[0].strip('\n').split('\n') if seg]
-
-def include_flags(segments, flags, optDict, verbose=False):
-    for flag in flags:
-        segments = andsegments(segments, query_flag(flag, optDict, verbose=verbose))
-
-    return segments
-
-def exclude_flags(segments, flags, optDict, verbose=False):
-    if not segments:
-        return segments
-
-    gpsstart = segments[0][0]
-    gpsstop = segments[-1][1]
-    for flag in flags:
-        segments = andsegments(segments, invsegments(gpsstart, gpsstop, query_flag(flag, optDict, verbose=verbose)))
-
-    return segments
-
-#-------------------------------------------------
-
 def extract_start_dur(path, suffix='.gwf'):
     return [int(_) for _ in path[:-len(suffix)].split('-')[-2:]]
 
-def vec_from_frames(frames, channel, start, stop, verbose=False):
-        """
-        returns a numpy array of the data inculded in frames between start and stop
-        CURRENTLY ASSUME CONTIGUOUS DATA, but we should check this
-
-        meant to be used with files_from_cache
-        """
-        vecs = []
-        dt = 0
-        for frame, frame_start, frame_dur in frames:
-                if verbose: 
-                    print( frame )
-                s = max(frame_start, start)
-                d = min(frame_start+frame_dur,stop) - s
-                out = frread.read_timeseries(frame, channel, start=s, duration=d)
-                vecs.append( out.data.data )
-                dt = out.deltaT
-        vec = np.concatenate(vecs)
-        return vec, dt
+#-------------------------------------------------
 
 def andsegments(list1, list2):
     """

@@ -7,16 +7,15 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 #-------------------------------------------------
 
 import os
-
 import gzip
-
 import subprocess as sp
 
 from optparse import OptionParser
 
 ### non-standard libraries
-import utils as utils
-import dft
+from exposure import utils
+from exposure import datafind
+from exposure import dft
 
 #-------------------------------------------------
 
@@ -78,8 +77,8 @@ opts.verbose |= opts.Verbose
 ### ensure we have proper coverage
 segments = [[gpsstart, gpsstop]]
 
-segments = utils.include_flags(segments, opts.include_flag, optDict, verbose=opts.verbose)
-segments = utils.exclude_flags(segments, opts.exclude_flag, optDict, verbose=opts.verbose)
+segments = datafind.include_flags(segments, opts.include_flag, optDict, verbose=opts.verbose)
+segments = datafind.exclude_flags(segments, opts.exclude_flag, optDict, verbose=opts.verbose)
 
 assert segments, 'no remaining livetime after filtering by flags!'
 assert len(segments)==1, 'more than one segment after filtering by flags!'
@@ -88,15 +87,7 @@ assert segments[0][0]==gpsstart and segments[0][1]==gpsstop, 'segments to not co
 #------------------------
 
 ### grab frames
-cmd = "gw_data_find -o %(observatory)s --type %(frametype)s --url file -s %(gpsstart)d -e %(gpsstop)d"%optDict
-if opts.verbose:
-    print( cmd )
-frames = []
-for frame in [frame for frame in sp.Popen(cmd.split(), stdout=sp.PIPE).communicate()[0].replace('file://localhost','').strip().split('\n') if frame]:
-    if opts.Verbose:
-        print( frame )
-    s, d = utils.extract_start_dur(frame)
-    frames.append( (frame, s, d) )
+frames = datafind.gw_data_find(optDict, verbose=opts.verbose)
 
 ### insure we have full coverage
 segs = utils.andsegments(segments, utils.mergesegments([(s,s+d) for _, s, d in frames]))
@@ -110,7 +101,7 @@ assert segs[0][0]==gpsstart and segs[0][1]==gpsstop, 'frame data does not cover 
 ### read in data
 if opts.verbose:
     print( 'reading data' )
-vect, dt = utils.vec_from_frames(frames, channel, gpsstart, gpsstop, verbose=opts.Verbose)
+vect, dt = datafind.vec_from_frames(frames, channel, gpsstart, gpsstop, verbose=opts.Verbose)
 
 ### compute PSD
 n = 1 + 1.*(gpsstop - gpsstart - opts.seglen)/(opts.seglen - opts.overlap)

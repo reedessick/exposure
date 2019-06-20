@@ -11,9 +11,10 @@ import os
 import numpy as np
 import healpy as hp
 
-import stats ### FIXME: call out this dependency in README
-
 from optparse import OptionParser
+
+### non-standard libraries
+from skymap_statistics import stats
 
 #-------------------------------------------------
 

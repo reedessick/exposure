@@ -26,3 +26,14 @@ We also provide some basic functionality to estimate diurnal cycles.
 
   - compute a time-frequency representation of lock segments to look for variabilitoy of periodic elements
     - `diurnal_timefreq`
+
+## Dependencies
+
+  - [skymap_statistics](https://github.com/reedessick/skymap_statistics)
+  - numpy
+  - matplotlib
+  - healpy
+  - lalsuite (lalframe.frread, gpstime.tconvert)
+  - corner.py
+
+**NOTE**, the library is not Python3 compatible (it uses deprecated functionality only available in Python2)
