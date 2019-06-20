@@ -1,0 +1,180 @@
+#!/usr/bin/env python
+
+__doc__ = "a script that lives persistently and computes PSDs, writes science segments periodically"
+__author__ = "R. Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import os
+import time
+
+import logging
+from logging.handlers import TimedRotatingFileHandler
+
+import numpy as np
+
+from argparse import ArgumentParser
+
+### non-standard libraries
+from exposure import datafind
+from exposure import dft
+
+from lal.gpstime import tconvert
+
+#-------------------------------------------------
+
+parser = ArgumentParser(description=__doc__)
+
+parser.add_argument('ldr_type', type=str)
+parser.add_argument('channel', type=str)
+
+parser.add_argument('--stride', default=datafind.DEFAULT_STRIDE, type=int,
+    help='the stride over which PSDs are cacluated')
+parser.add_argument('--delay', default=datafind.DEFAULT_DELAY, type=int,
+    help='the amount we stay behind realtime within the persistent loop')
+parser.add_argument('--max-latency', default=datafind.DEFAULT_MAX_LATENCY, type=float,
+    help='the maximum latency tolerated before jumping to the current time within the loop')
+
+parser.add_argument("--seglen", default=dft.DEFAULT_SEGLEN, type=int,
+    help='the length of segments used to estimate the PSD via an averaging procedure (specify in seconds). \
+NOTE: if we do not obtain an integer number of segments based on --seglen, --overlap, gpsstart, and gpsstop, \
+we will raise a ValueError.')
+parser.add_argument("--overlap", default=dft.DEFAULT_OVERLAP, type=float,
+    help='the amount of time overlapped for segments used to estimate the PSD (specify in seconds). \
+NOTE: if we do not obtain an integer number of segments based on --seglen, --overlap, gpsstart, and gpsstop, \
+we will raise a ValueError.')
+parser.add_argument("--tukey-alpha", default=dft.DEFAULT_TUKEY_ALPHA, type=float,
+    help='the Tukey "alpha" value used for windowing the DFT.')
+
+parser.add_argument('--gpsstart', type=float, default=None)
+parser.add_argument('--gpsstop', type=float, default=None)
+
+parser.add_argument('--segs-channel-bitmask', default=[], nargs=2, type=str, action='append',
+    help='channel and bitmask pairs used to define science segments. eg, "--segs-channel-bitmask H1:GDS-CALIB_STATE 8". can be repeated.')
+
+parser.add_argument('-v', '--verbose', default=False, action='store_true')
+
+parser.add_argument('-o', '--output-dir', default='.', type=str)
+parser.add_argument('-t', '--tag', default='', type=str)
+
+args = parser.parse_args()
+
+ifo = args.channel[0]
+
+if args.gpsstart is None:
+    args.gpsstart = tconvert('now')
+
+if args.gpsstop is None:
+    args.gpsstop = np.infty
+
+args.segs_channel_bitmask = [(channel, int(bitmask)) for channel, bitmask in args.segs_channel_bitmask]
+
+if args.tag:
+    args.tag = "_"+args.tag
+
+if not os.path.exists(args.output_dir):
+    os.makedirs(args.output_dir)
+
+#-------------------------------------------------
+
+### set up logger
+logdir = os.path.join(args.output_dir, 'log')
+if not os.path.exists(logdir):
+    os.makedirs(logdir)
+
+logname = os.path.basename(__file__)+args.tag
+logpath = os.path.join(logdir, logname+'.log')
+
+logger = logging.getLogger(logname)
+logger.setLevel(10)
+
+handlers = [
+    TimedRotatingFileHandler(logpath, when='D', utc=True)
+]
+if args.verbose:
+    handlers.append( logging.StreamHandler() )
+
+formatter = logging.Formatter('%(asctime)s | %(name)s : %(levelname)s : %(message)s')
+for handler in handlers:
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+#-------------------------------------------------
+
+### set up PSD parameters
+logger.info('setting up parameters of persistent loop')
+
+# number of segments for our PSD estimate
+n = 1 + 1.*(args.stride - args.seglen)/(args.seglen - args.overlap)
+assert n%1==0, 'must be an integer number of segments used to compute PSD! Check your combination of gpsstart, gpsstop, --seglen, and --overlap'
+n = int(n)
+
+overlap = 1.*args.overlap/args.seglen ### the fractional overlap we want
+
+### set up logger templates
+datafindtmp = 'finding '+args.ldr_type+' frames within [%d, %d).'
+timeouttmp = 'latency exceeded maximum value (%.3f sec)!'%args.max_latency +' Skipping data within [%d, %d).'
+
+segstmp = 'extracting segments from %s with bitmask %d within [%d, %d).'
+segswritetmp = 'writing segments to %s for [%d, %d)'
+coveragetmp = 'less than 100% coverage from segments! Skipping data within [%d, %d).'
+
+readtmp = 'reading '+args.channel+' data within [%d, %d).'
+psdtmp = 'estimating PSD within [%d, %d) using '+'%d segments with %.3f fractional overlap.'%(n, overlap)
+psdwritetmp = 'writing PSD estimate for %s'%args.channel + ' to %s for [%d, %d).'
+
+### enter persistent loop
+logger.info('entering persistent loop')
+while current < args.stop:
+    future = current+stride
+    tup = (current, future)
+
+    datafind.wait(current, delay=args.delay) ### wait until there is a chance of finding some data
+
+    ### find data
+    logger.info(datafindtmp%tup)
+    while datafind.latency(delay=args.delay) < args.max_latency:
+        frames = datafind.shm_data_find(ifo, ldr_type, current, stride)
+        if datafind.coverage(frames, current, stride) >= 1: 
+            break
+    else:
+        logger.warn(timeouttmp%tup)
+        current = future
+        continue
+
+    # Note: we can only get here if we have at least 100% coverage
+
+    ### read in data to extract science segments
+    segs = [(current, future)]
+    for segs_channel, segs_bitmask in args.segs_channel_bitmask:
+        logger.info(segstmp%(segs_channel, segs_bitmask,)+tup)
+        segs = utils.andsegments(datafind.extract_scisegs(frames, args.segs_channel, args.seg_bitmask, current, stride), segs)
+
+    # write segments
+    thisdir = utils.gps2moddir(args.output_dir, current)
+    if not os.path.exists(thisdir):
+        os.makedirs(thisdir)
+
+    segspath = utils.seg_path(args.output_dir, args.tag, current, stride)
+    logger.info(segswritetmp%(segspath,)+tup)
+    utils.report_segs(segspath, segs)
+
+    ### confirm that we have 100% coverage from segments
+    if (len(segs)!=1) or (segs[0][0]!=current) or (segs[0][1]!=future): ### this should be sufficient...
+        logger.info(coveragetmp%tup)
+        current = future
+        continue
+
+    ### read in data to compute PSD
+    logger.info(psdtmp%tup)
+    vec, dt = datafind.vec_from_frames(frames, args.channel, current, future)
+    psd, freqs = dft.estimate_psd(vec, num_segs=n, overlap=overlap, dt=dt, tukey_alpha=argss.tukey_alpha)
+   
+    # write PSD
+    thatdir = utils.gps2dir(args.output_dir, current, stride)
+    if not os.path.exists(thatdir):
+        os.makedirs(thatdir)
+    psdpath = utils.psd_path(thatdir, args.tag, current, stride)
+    logger.info(psdwritetmp%(psdpath,)+tup)
+
+    utils.report_psd(psdpath, freqs, psd)
