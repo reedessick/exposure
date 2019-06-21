@@ -3,13 +3,16 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 
 #-------------------------------------------------
 
+import glob
 import time
+
+import numpy as np
 
 import subprocess as sp
 
 ### non-standard libraries
 from lalframe import frread
-from lal.gpstime import tconvert
+from lal.gpstime import tconvert as lal_tconvert
 
 from . import utils
 
@@ -18,16 +21,25 @@ from . import utils
 DEFAULT_STRIDE = 60
 DEFAULT_DELAY = 0
 DEFAULT_MAX_LATENCY = 2*DEFAULT_STRIDE
+DEFAULT_CADENCE = 1e-3
 
 #-------------------------------------------------
 
-def latency(delay=DEFAULT_DELAY):
-    return tconvert('now')-delay
+def tconvert(arg='now'):
+    return float(lal_tconvert(arg))
 
-def wait(target, delay=DEFAULT_DELAY):
-    w = latency(delay=delay) - target
-    if w > 0:
-        time.sleep(w)
+def latency(target, delay=DEFAULT_DELAY):
+    return tconvert('now')-delay - target
+
+def wait(target, delay=DEFAULT_DELAY, logger=None):
+    w = max(0, -latency(target, delay=delay))
+    if logger is not None:
+        logger.info('sleeping for %.3f sec'%w)
+    sleep(w)
+
+def sleep(dt):
+    if dt > 0:
+        time.sleep(dt)
 
 #-------------------------------------------------
 
@@ -80,9 +92,10 @@ def vec_from_frames(frames, channel, start, stop, verbose=False):
                     print( frame )
                 s = max(frame_start, start)
                 d = min(frame_start+frame_dur,stop) - s
-                out = frread.read_timeseries(frame, channel, start=s, duration=d)
-                vecs.append( out.data.data )
-                dt = out.deltaT
+                if d > 0:
+                    out = frread.read_timeseries(frame, channel, start=s, duration=d)
+                    vecs.append( out.data.data )
+                    dt = out.deltaT
         vec = np.concatenate(vecs)
         return vec, dt
 
@@ -149,16 +162,16 @@ def gw_data_find(ifo, ldr_type, start, stride, verbose=False):
         frames.append( (frame, s, d) )
     return frames
 
-def shm_data_find(directory, ifo, ldr_type, start, stride, verbose=False):
+shm_glob_tmp = "%s/%s1/%s-%s-*-*.gwf"
+def shm_data_find(ifo, ldr_type, start, stride, directory='.', verbose=False):
     """a routine to automate discovery of frames within /dev/shm
     """
     end = start+stride
-
     frames = []
-    for frame, (s, d) in [(frame, utils.extract_start_dur(frame, suffix=".gwf")) for frame in \
-                                 sorted(glob.glob("%s/%s1/%s-%s-*-*.gwf"%(directory, ifo, ifo, ldr_type)))]:
-          if (s <= end) and (s+d >= start): ### there is some overlap!
-                frames.append( frame )
+    for frame in sorted(glob.glob(shm_glob_tmp%(directory, ifo, ifo, ldr_type))):
+          s, d = utils.extract_start_dur(frame, suffix=".gwf")
+          if (s <= end) and (s+d > start): ### there is some overlap!
+                frames.append( (frame, s, d) )
 
     return frames
 
@@ -168,15 +181,13 @@ def coverage(frames, start, stride):
     assumes non-overlapping frames!
     """
     ### generate segments from frame names
-    segs = [utils.extract_start_dur(frame) for frame in sorted(frames)]
+    segs = [(s, s+d) for _, s, d in sorted(frames)]
 
     ### check whether segments overlap with desired time range
     covered = 1.0*stride
 
     end = start + stride
-    for s, d in segs:
-        e = s+d
-
+    for s, e in segs:
         if (s < end) and (start < e): ### at least some overlap
             covered -= min(e, end) - max(s, start) ### subtract the overlap
 

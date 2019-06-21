@@ -19,8 +19,6 @@ plt.rcParams['text.usetex'] = True
 from optparse import OptionParser
 
 ### non-standard libraries
-from lal.gpstime import tconvert
-
 from exposure import utils
 from exposure import datafind
 
@@ -38,7 +36,7 @@ parser.add_option("", "--exclude-flag", default=[], type='string', action='appen
     help='the same as --include-flag, except we only retain times that are \
 outside of these flags instead of inside them')
 
-parser.add_option('', '--reference-gps', default=float(tconvert('Sep 12 2015 00:00:00')), type='float',
+parser.add_option('', '--reference-gps', default=datafind.tconvert('Sep 12 2015 00:00:00'), type='float',
     help='DEFAULT=tconvert("Sep 12 2015 00:00:00 UTC"). Should be specified as a float.')
 
 parser.add_option('', '--period', default=86400, type='float',
