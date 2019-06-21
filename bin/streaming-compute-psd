@@ -142,7 +142,7 @@ while current < args.gpsstop:
     tup = (current, future)
     logger.info(infotmp%tup)
 
-    datafind.wait(current, delay=args.delay, logger=logger) ### wait until there is a chance of finding some data
+    datafind.wait(future, delay=args.delay, logger=logger) ### wait until there is a chance of finding some data
 
     ### find data
     logger.info(datafindtmp%tup)
