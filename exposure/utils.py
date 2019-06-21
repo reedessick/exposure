@@ -133,7 +133,7 @@ def segs_path(output_dir, tag, gpsstart, gpsdur):
     return "%s/seg%s-%d-%d.txt.gz"%(gps2moddir(output_dir, gpsstart), tag, (int(gpsstart)/MOD_STRIDE)*MOD_STRIDE, MOD_STRIDE)
 
 def psd_path(output_dir, tag, gpsstart, gpsdur):
-    return "%s/psd%s-%d-%d.txt.gz"%(output_dir, tag, gpsstart, gpsdur)
+    return "%s/psd%s-%d-%d.txt.gz"%(gps2dir(output_dir, gpsstart, gpsdur), tag, gpsstart, gpsdur)
 
 def horizon_path(output_dir, tag, gpstart, gpsdur):
     return "%s/horizon%s-%d-%d.txt.gz"%(output_dir, tag, gpstart, gpsdur)

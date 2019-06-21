@@ -171,7 +171,7 @@ while current < args.gpsstop:
 
     # write segments
     segspath = utils.segs_path(args.output_dir, args.tag, current, args.stride)
-    thisdir = os.path.basename(segspath)
+    thisdir = os.path.dirname(segspath)
     if not os.path.exists(thisdir):
         os.makedirs(thisdir)
     logger.info(segswritetmp%((segspath,)+tup))
@@ -190,7 +190,7 @@ while current < args.gpsstop:
    
     # write PSD
     psdpath = utils.psd_path(args.output_dir, args.tag, current, args.stride)
-    thatdir = os.path.basename(psdpath)
+    thatdir = os.path.dirname(psdpath)
     if not os.path.exists(thatdir):
         os.makedirs(thatdir)
     logger.info(psdwritetmp%((psdpath,)+tup))
