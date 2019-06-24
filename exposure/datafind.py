@@ -11,8 +11,15 @@ import numpy as np
 import subprocess as sp
 
 ### non-standard libraries
-from lalframe import frread
-from lal.gpstime import tconvert as lal_tconvert
+try:
+    from lalframe import frread
+except ImportError:
+    frread = None
+
+try:
+    from lal.gpstime import tconvert as lal_tconvert
+except ImportError:
+    lal_tconvert = None
 
 from . import utils
 
@@ -26,6 +33,8 @@ DEFAULT_CADENCE = 1e-3
 #-------------------------------------------------
 
 def tconvert(arg='now'):
+    if lal_tconvert is None:
+        raise ImportError('could not import lal.gpstime.tconvert!')
     return float(lal_tconvert(arg))
 
 def latency(target, delay=DEFAULT_DELAY):
@@ -81,23 +90,25 @@ def exclude_flags(segments, flags, start, stride, verbose=False):
 ### DATA EXTRACTION AND MANIPULATION
 
 def vec_from_frames(frames, channel, start, stop, verbose=False):
-        """
-        returns a numpy array of the data inculded in frames between start and stop
-        CURRENTLY ASSUME CONTIGUOUS DATA, but we should check this
-        """
-        vecs = []
-        dt = 0
-        for frame, frame_start, frame_dur in frames:
-                if verbose:
-                    print( frame )
-                s = max(frame_start, start)
-                d = min(frame_start+frame_dur,stop) - s
-                if d > 0:
-                    out = frread.read_timeseries(frame, channel, start=s, duration=d)
-                    vecs.append( out.data.data )
-                    dt = out.deltaT
-        vec = np.concatenate(vecs)
-        return vec, dt
+    """
+    returns a numpy array of the data inculded in frames between start and stop
+    CURRENTLY ASSUME CONTIGUOUS DATA, but we should check this
+    """
+    if frread is None:
+        raise ImportError('could not import lalframe.frread!')
+    vecs = []
+    dt = 0
+    for frame, frame_start, frame_dur in frames:
+        if verbose:
+            print( frame )
+        s = max(frame_start, start)
+        d = min(frame_start+frame_dur,stop) - s
+        if d > 0:
+            out = frread.read_timeseries(frame, channel, start=s, duration=d)
+            vecs.append( out.data.data )
+            dt = out.deltaT
+    vec = np.concatenate(vecs)
+    return vec, dt
 
 def extract_scisegs(frames, channel, bitmask, start, stride, verbose=False):
     """
