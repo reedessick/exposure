@@ -133,7 +133,10 @@ def segs_path(output_dir, tag, gpsstart, gpsdur):
     return "%s/seg%s-%d-%d.txt.gz"%(gps2moddir(output_dir, gpsstart), tag, (int(gpsstart)/MOD_STRIDE)*MOD_STRIDE, MOD_STRIDE)
 
 def psd_path(output_dir, tag, gpsstart, gpsdur):
-    return "%s/psd%s-%d-%d.txt.gz"%(gps2dir(output_dir, gpsstart, gpsdur), tag, gpsstart, gpsdur)
+    return "%s/psd%s-%d-%d.csv.gz"%(gps2dir(output_dir, gpsstart, gpsdur), tag, gpsstart, gpsdur)
+
+def samples_path(output_dir, tag, gps, gpsdur):
+    return "%s/samples%s-%d-%d.csv.gz"%(gps2dir(output_dir, gpsstart, gpsdur), tag, gpsstart, gpsdur)
 
 def horizon_path(output_dir, tag, gpstart, gpsdur):
     return "%s/horizon%s-%d-%d.txt.gz"%(output_dir, tag, gpstart, gpsdur)
@@ -158,7 +161,14 @@ def extract_start_dur(path, suffix='.gwf'):
 def report_psd(path, freqs, psd):
     """writes the PSD to disk
     """
-    np.savetxt(path, np.array(zip(freqs, psd)), delimiter=' ')
+    np.savetxt(path, np.array(zip(freqs, psd)), comments='', delimiter=',', header='frequency,psd')
+
+def retrieve_psd(path):
+    """read the PSD from disk
+    return freqs, psd
+    """
+    ans = np.loadtxt(path, delimiter=',', names=True)
+    return ans['frequency'], ans['psd']
 
 def report_segs(path, new_segs):
     """reads in the segments contained in path and appends the current seg of segs to them
@@ -168,7 +178,7 @@ def report_segs(path, new_segs):
 
     ### read in and merge segs if necessary
     if os.path.exists(path):
-        segs = list(np.loadtxt(path))
+        segs = retrieve_segs(path)
         if len(segs):
             if np.ndim(segs)==1: ### a single segment
                 segs = [segs]
@@ -190,6 +200,22 @@ def report_segs(path, new_segs):
 
     ### write the result back out
     np.savetxt(path, segs, fmt='%d')
+
+def retrieve_segs(path):
+    """retrieves segments from disk
+    """
+    return list(np.loadtxt(path))
+
+def report_samples(path, samples):
+    """reports samples to disk. Assumes samples is a structured numpy.ndarray and saves it into a CSV file
+    """
+    names = samples.dtype.names
+    np.savetxt(path, np.array(zip(*[samples[name] for name in names])), comments='', delimiter=',', header=','.join(names))
+
+def retrieve_samples(path):
+    """retrieves samples from disk
+    """
+    return np.genfromtxt(path, names=True, delimiter=',')
 
 #-------------------------------------------------
 
