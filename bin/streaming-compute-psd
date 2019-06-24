@@ -6,7 +6,6 @@ __author__ = "R. Essick (reed.essick@ligo.org)"
 #-------------------------------------------------
 
 import os
-import time
 
 import logging
 from logging.handlers import TimedRotatingFileHandler
@@ -66,7 +65,7 @@ args = parser.parse_args()
 ifo = args.channel[0]
 
 if args.gpsstart is None:
-    args.gpsstart = int(datafind.tconvert('now'))
+    args.gpsstart = int(datafind.tconvert())
 
 if args.gpsstop is None:
     args.gpsstop = np.infty
