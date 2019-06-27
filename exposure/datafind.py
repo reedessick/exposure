@@ -161,7 +161,7 @@ def gw_data_find(ifo, ldr_type, start, stride, verbose=False):
         'observatory':ifo,
         'frametype':ldr_type,
         'gpsstart':start,
-        'gpsend':start+stride,
+        'gpsstop':start+stride,
     }
     if verbose:
         print( cmd )

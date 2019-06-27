@@ -109,6 +109,9 @@ psd, freqs = dft.estimate_psd(vect, num_segs=n, overlap=overlap, dt=dt, tukey_al
 
 ### write PSD
 path = utils.psd_path(opts.output_dir, opts.tag, gpsstart, gpsstop-gpsstart)
+directory = os.path.dirname(path)
+if not os.path.exists(directory):
+    os.makedirs(directory)
 if opts.verbose:
     print( "writing : "+path )
-utils.report_psd(psdpath, freqs, psd)
+utils.report_psd(path, freqs, psd)
