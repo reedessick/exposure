@@ -193,11 +193,13 @@ def __resample_lowpass(vec, dt, new_dt):
 #=================================================
 # PSD utilities
 #=================================================
-def estimate_psd(vec, num_segs=DEFAULT_NUM_SEGS, overlap=DEFAULT_OVERLAP, dt=DEFAULT_DT, tukey_alpha=DEFAULT_TUKEY_ALPHA):
+def estimate_psd(vec, num_segs=DEFAULT_NUM_SEGS, overlap=DEFAULT_OVERLAP, dt=DEFAULT_DT, tukey_alpha=DEFAULT_TUKEY_ALPHA, one_sided=True):
         """
         estimates the PSD using a DFT
         divides vec into "num_segs" with a fractional overlap of "overlap" between neighbors
-        returns the average PSD from these samples
+        returns the average PSD from these samples (arithmetic mean)
+
+        if one_sided, returns the one-sided PSD. Otherwise, returns the two-sided PSD (one half the one-sided PSD).
 
         WARNING: your logic on how to split segments may be fragile...
         """
@@ -220,5 +222,8 @@ def estimate_psd(vec, num_segs=DEFAULT_NUM_SEGS, overlap=DEFAULT_OVERLAP, dt=DEF
 
         ### average
         mean_psd = np.sum(psds.real**2 + psds.imag**2, axis=1) / (seglen*num_segs)
+
+        if one_sided:
+            mean_psd *= 2 ### multiply by 2 to account for the power at negative frequencies in the one-sided PSD
 
         return mean_psd, freqs
