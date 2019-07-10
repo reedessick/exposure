@@ -1,0 +1,18 @@
+#!/usr/bin/env python
+"""a simple executable to compute a detector's horizon that lives persistently
+"""
+__author__ = "Reed Essick <reed.essick@gmail.com>"
+
+#-------------------------------------------------
+
+from argparse import ArgumentParser
+
+#-------------------------------------------------
+
+parser = ArgumentParser(description=__doc__)
+
+args = parser.parse_args()
+
+#-------------------------------------------------
+
+raise NotImplementedError

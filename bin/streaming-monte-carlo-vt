@@ -1,0 +1,212 @@
+#!/usr/bin/env python
+
+__doc__ = "a script that lives persistently and records Monte-Carlo samples of the VT integral"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import os
+
+import logging
+from logging.handlers import TimedRotatingFileHandler
+
+import numpy as np
+
+from argparse import ArgumentParser
+
+### non-standard libraries
+from exposure import datafind
+from exposure import utils
+
+from skymap_statistics import detector_cache
+
+#-------------------------------------------------
+
+DEFAULT_MIN_NUM_SAMPLES = 100
+DEFAULT_ERROR = 1e-3
+
+#-------------------------------------------------
+
+parser = ArgumentParser(description=__doc__)
+
+parser.add_argument('pop_spec', type=str,
+    help='the population specification config used to genreate Monte-Carlo samples. \
+This includes things like mass, spin, and redshift distributions, although we will \
+dynamically determine the maximum redshift for detectable sources given each set of PSDs.')
+
+parser.add_argument('-s', '--source', default=[], required=True, nargs=3, type=str, action='append',
+    help='a source of PSDs. This can be repeated to specify multiple IFOs. eg, "--source IFO rootdir tag')
+
+parser.add_argument('--stride', default=datafind.DEFAULT_STRIDE, type=int,
+    help='the stride over which PSDs are cacluated. **NOTE**, this must match the stride with which all PSDs are generated.')
+parser.add_argument('--delay', default=datafind.DEFAULT_DELAY, type=int,
+    help='the amount we stay behind realtime within the persistent loop')
+parser.add_argument('--max-latency', default=datafind.DEFAULT_MAX_LATENCY, type=float,
+    help='the maximum latency tolerated before jumping to the current time within the loop')
+parser.add_argument('--cadence', default=datafind.DEFAULT_CADENCE, type=float,
+    help='the amount of time we wait between I/O queries to find frames')
+
+parser.add_argument('-N', '--min-num-samples', default=DEFAULT_MIN_NUM_SAMPLES, type=int,
+    help='the minimum number of Monte-Carlo samples to be generated for each stride, independent of the "smart" termination condition')
+parser.add_argument('-f', '--fractional-systematic-error', default=DEFAULT_ERROR, type=float,
+    help='the desired fractional systematic error expected from the Monte-Carlo integral for VT based on Farr (2019): arXiv:XXX. \
+**NOTE**, we assume zero observations (Nobs=0) in the derrived expressions, which will only scale the actual fractional systematic error \
+approximately linearly with the actually number of observaitons.')
+
+parser.add_argument('-v', '--verbose', default=False, action='store_true')
+
+parser.add_argument('--gpsstart', type=float, default=None)
+parser.add_argument('--gpsstop', type=float, default=None)
+
+parser.add_argument('--output-dir', default='.', type=str)
+parser.add_argument('--tag', default='', type=str)
+
+args = parser.parse_args()
+
+if args.gpsstart is None:
+    args.gpsstart = int(datafind.tconvert())
+
+if args.gpsstop is None:
+    args.gpsstop = np.infty
+
+if args.tag:
+    args.tag = "_"+args.tag
+
+if not os.path.exists(args.output_dir):
+    os.makedirs(args.output_dir)
+
+#------------------------
+
+for ifo, _, _ in args.source:
+    assert ifo in detector_cache.detectors, 'ifo=%s not a known detector! known detectors are %s'%(ifo, ', '.join(detector_cache.detectors.keys()))
+
+#-------------------------------------------------
+
+### set up logger
+logdir = os.path.join(args.output_dir, 'log')
+if not os.path.exists(logdir):
+    os.makedirs(logdir)
+
+logname = os.path.basename(__file__)+args.tag
+logpath = os.path.join(logdir, logname+'.log')
+
+logger = logging.getLogger(logname)
+logger.setLevel(10)
+
+handlers = [
+    TimedRotatingFileHandler(logpath, when='D', utc=True)
+]
+if args.verbose:
+    handlers.append( logging.StreamHandler() )
+
+formatter = logging.Formatter('%(asctime)s | %(name)s : %(levelname)s : %(message)s')
+for handler in handlers:
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+#-------------------------------------------------
+
+### read in population specification
+logger.info('reading in population specifications from: '+args.pop_spec)
+
+raise NotImplementedError('read in population specification, possibly instantiate some object?')
+
+#-------------------------------------------------
+
+### set up logger templates
+infotmp = 'processing data within [%d, %d).'
+
+psdtmp = 'searching for PSD for %s with rootdir=%s, tag=%s'
+psdtmps = dict((ifo, psdtmp%(ifo, rootdir, tag)+' within [%d, %d).') for ifo, rootdir, tag in args.source)
+
+updatetmp = 'updating PSD for %s from %s for data within [%d, %d).'
+
+timeouttmp = 'latency exceeded maximum value (%.3f sec) while searching for PSD from %s!'
+timeouttmps = dict((ifo, timeouttmp%(args.max_latency, ifo)+' Skipping data within [%d, %d).') for ifo, _, _ in args.source)
+
+missingtmp = 'no PSD found for any IFO. Skipping data within [%d, %d).'
+foundtmp = 'found PSDs for %d IFOs (%s) within [%d, %d).'
+
+limittmp = 'Determining appropriate maximum horizon distance for data within [%d, %d).'
+montetmp = 'Monte-Carlo sampling VT integral to fractional precision of %.3e with at least %d samples'%\
+    (args.fractional_systematic_error, args.min_num_samples) + ' for data within [%d, %d).'
+
+latencytmp = 'latency=%.3f sec for data within [%d, %d).'
+
+### enter persistent loop
+logger.info('entering persistent loop')
+current = (args.gpsstart // args.stride)*args.stride
+while current < args.gpsstop:
+    future = current + args.stride
+    tup = (current, future)
+    logger.info(infotmp%tup)
+
+    ### search for PSDs for this stride
+    present = [] # lists which IFOs were locked (encoded by available PSDs)
+    for ifo, rootidr, tag in args.source:
+        logger.info(psdtmps[ifo]%tup)
+        psdpath = utils.psd_path(rootdir, tag, current, args.stride)
+        while datafind.latency(current, delay=args.delay) < args.max_latency:
+            if os.path.exists(psdpath):
+                logger.info(updatetmp%((ifo, psdpath,)+tup))
+                freqs, psd = utils.retrieve_psd(psdpath) ### read from disk
+                det = detector_cache.detectors[ifo]
+                det.psd.update(psd, freqs=freqs) ### update object in place 
+                present.append(det) ### append object to list of dectors for which we found data
+                break
+            else:
+                datafind.sleep(args.cadence)
+        else:
+            logger.warn(timeouttmps[ifo]%tup)
+
+    if not present:
+        logger.warn(missingtmp%tup)
+        current = future ### bump to next stride
+        continue
+
+    # Note: we can only get here if we have at least one active detector
+    logger.info(foundtmp%(len(present), ', '.join(_.name for _ in present)))
+
+    ### generate Monte-Carlo samples of VT
+    logger.info(limittmp%tup)
+    raise NotImplementedError('''
+find maximum distance for detectable things
+    -> difficult when we use a non-central chi2 distrib to measure p(det)...
+    -> maybe just require cdf(det) to be less than some small fraction --> control the systematic error from this truncation to an acceptable level?
+
+Maybe we just Monte-Carlo at a fixed distance and determine the maximum SNR observed? With that, we can scale the maximum distance based on that fixed distance and the assumption that everything with SNR below some value has negligible probability of being detected
+''')
+
+    logger.info(montetmp%tup)
+    N = 0
+    e1 = 0
+    e2 = 0
+    de1 = 0
+    de2 = 0
+
+    raise NotImplementedError('''***write Monte-Carlo Algorithm***
+    while (N < args.min_num_samples) and (smart termination condition not satisfied, based on args.fractional_systematic_error):
+        estimate the number of samples we want: max(args.min_num_samples, smart estimate based on args.fractional_systematic_error)
+        draw new samples
+        for sample in new samples
+            generate waveform for sample
+            snr_sqrd = sum(detector.snr(waveform)**2 for detector in present)
+            compute cdf of detectability given this snr_sqrd (should be based on a non-central chi-squared distribution)
+            update unnormalized monte-carlo sums (smart termination condition)
+            record sample, p(sample|det)
+
+    Need to define a structured array called "samples", which we write to disk in the following step
+''')
+
+    ### write samples
+    samplespath = utils.samples_path(args.output_dir, args.tag, current, args.stride)
+    thatdir = os.path.dirname(samplespath)
+    if not os.path.exists(thatdir):
+        os.makedirs(thatdir)
+    logger.info(psdwritetmp%((samplespath,)+tup))
+
+    utils.report_psd(samplespath, samples)
+
+    ### increment to the next stride
+    logger.info(latencytmp%((datafind.latency(current, delay=args.delay),)+tup))
+    current = future
