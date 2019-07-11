@@ -124,7 +124,6 @@ def update_max_redshift(generator, network):
     **NOTE**: right now, we just skip this and leave the generator untouched...this will not scale well if the detector sensitivities change significantly!
 """
     pass
-
     '''
 find maximum distance for detectable things
     -> difficult when we use a non-central chi2 distrib to measure p(det)...
@@ -133,29 +132,38 @@ find maximum distance for detectable things
 Maybe we just Monte-Carlo at a fixed distance and determine the maximum SNR observed? With that, we can scale the maximum distance based on that fixed distance and the assumption that everything with SNR below some value has negligible probability of being detected
 '''
 
+def update_montecarlo_counters(event, e1, e2, de1, de2, Nparams):
+    """update the montecarlo counters for our smart termination condition
+    """
+    raise NotImplementedError('return e1, e2, de1, de2')
+
 def montecarlo(generator, network, min_num_samples=DEFAULT_MIN_NUM_SAMPLES, error=DEFAULT_ERROR):
     """generate samples from generator until we reach the termination conditions specified by min_num_samples and error
     """
+    ### generate the minimum number of samples required
+    generator.generate_events(n_iter=np.infty, n_event=min_num_samples, generator=False) ### just store these quietly internally
 
-    ### FIXME: if error==np.infty, don't bother with the "smart termination condition"
-    N = 0
-    e1 = 0
-    e2 = 0
-    de1 = 0
-    de2 = 0
+    # figure out whether we want to even attempt the "smart termination condition"
+    if error!=np.infty:
 
-    raise NotImplementedError('''***write Monte-Carlo Algorithm***
-    while (N < args.min_num_samples) and (smart termination condition not satisfied, based on args.fractional_systematic_error):
-        estimate the number of samples we want: max(args.min_num_samples, smart estimate based on args.fractional_systematic_error)
-        draw new samples
-        for sample in new samples
-            generate waveform for sample
-            snr_sqrd = sum(detector.snr(waveform)**2 for detector in present)
-            compute cdf of detectability given this snr_sqrd (should be based on a non-central chi-squared distribution)
-            update unnormalized monte-carlo sums (smart termination condition)
-            record sample, p(sample|det)
+        ### set up the further iteration
+        Nparams = sum(len(gen._params) for gen in generator._generators)
+        e1 = 0
+        e2 = 0
+        de1 = np.zeros(Nparams, dtype=float)
+        de2 = np.zeros(Nparams, dtype=float)
+        for event in generator._events:
+            e1, e2, de1, de2 = update_montecarlo_counters(event, e1, e2, de1, de2, Nparams)
 
-    Need to define a structured array called "samples", which we write to disk in the following step
-''')
+        for event in generator.generate_events(n_iter=np.infty, n_event=np.infty, generator=True): ### go forever until we are told to stop
+            for i in range(Nparams):
+                raise NotImplementedError('check smart termination condition. If this is not satisfied, we break')
+            else:
+                break ### all smart termination conditions are satisfied, so we break the broader iteration
 
-    ### NOTE: need to be careful about what we return and make sure it plays nicely wiht utils.report_samples, which expects a numpy structured array
+            ### update monte-carlo sums
+            e1, e2, de1, de2 = update_montecarlo_counters(event, e1, e2, de1, de2, Nparams)
+
+    ### format the samples into a numpy structured array compatible with writing to disk
+    attrs = sorted(generator.attributes)
+    return np.array([[getattr(event, attr) for attr in attrs] for event in generator._events], dtype=[(attr, float) for attr in attrs])

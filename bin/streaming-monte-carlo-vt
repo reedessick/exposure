@@ -23,6 +23,10 @@ from skymap_statistics import detector_cache
 
 #-------------------------------------------------
 
+DEFAULT_SNR_THRESHOLD = 8.
+
+#-------------------------------------------------
+
 parser = ArgumentParser(description=__doc__)
 
 parser.add_argument('population', type=str,
@@ -32,6 +36,8 @@ dynamically determine the maximum redshift for detectable sources given each set
 
 parser.add_argument('-s', '--source', default=[], required=True, nargs=3, type=str, action='append',
     help='a source of PSDs. This can be repeated to specify multiple IFOs. eg, "--source IFO rootdir tag')
+parser.add_argument('--snr-threshold', default=DEFAULT_SNR_THRESHOLD, type=float,
+    help='the network SNR threshold for detection. Used within gw_event_gen.eventgen.Pdet to determine the probability of detecting a signal')
 
 parser.add_argument('--stride', default=datafind.DEFAULT_STRIDE, type=int,
     help='the stride over which PSDs are cacluated. **NOTE**, this must match the stride with which all PSDs are generated.')
@@ -107,6 +113,17 @@ for handler in handlers:
 logger.info('reading in population specifications from: '+args.population)
 generator = montecarlo.path2generator(args.population)
 
+### add AttributeTransformation for Pdet
+network = detector_cache.Network() # declare this shared reference here
+celest2geo = False
+for trans in generator._transforms:
+    if isinstance(trans, eventgen.Pdet):
+        raise RuntimeError('please do not specify Pdet within %s; this will be instantiated separately'%args.population)
+    celest2geo += isinstance(trans, event.Celestial2Geographic):
+generator.append_transform(eventgen.Pdet(network, snr_thr=args.snr_threshold))
+if not celest2geo:
+    generator.append_transform(eventgen.Celestial2Geographic())
+
 #-------------------------------------------------
 
 ### set up logger templates
@@ -138,7 +155,10 @@ while current < args.gpsstop:
     logger.info(infotmp%tup)
 
     ### search for PSDs for this stride
-    present = [] # lists which IFOs were locked (encoded by available PSDs)
+    # remove all detectors from the network, adding back in only those that are present
+    for det in network._instr:
+        network.remove(det)
+
     for ifo, rootidr, tag in args.source:
         logger.info(psdtmps[ifo]%tup)
         psdpath = utils.psd_path(rootdir, tag, current, args.stride)
@@ -148,27 +168,27 @@ while current < args.gpsstop:
                 freqs, psd = utils.retrieve_psd(psdpath) ### read from disk
                 det = detector_cache.detectors[ifo]
                 det.psd.update(psd, freqs=freqs) ### update object in place 
-                present.append(det) ### append object to list of dectors for which we found data
+                network.add(det) ### append object to list of dectors for which we found data
                 break
             else:
                 datafind.sleep(args.cadence)
         else:
             logger.warn(timeouttmps[ifo]%tup)
 
-    if not present:
+    if not network._instr:
         logger.warn(missingtmp%tup)
         current = future ### bump to next stride
         continue
 
     # Note: we can only get here if we have at least one active detector
-    logger.info(foundtmp%(len(present), ', '.join(_.name for _ in present)))
+    logger.info(foundtmp%(len(network), ', '.join(_.name for _ in network._instr)))
 
     ### generate Monte-Carlo samples of VT
     logger.info(limittmp%tup)
-    montecarlo.update_max_redshift(generator, present)
+    montecarlo.update_max_redshift(generator, network
 
     logger.info(montetmp%tup)
-    samples = montecarlo.montecarlo(generator, present, min_num_samples=args.min_num_samples, error=args.fractional_systematic_error)
+    samples = montecarlo.montecarlo(generator, network, min_num_samples=args.min_num_samples, error=args.fractional_systematic_error)
 
     ### write samples
     samplespath = utils.samples_path(args.output_dir, args.tag, current, args.stride)
