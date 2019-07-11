@@ -17,19 +17,15 @@ from argparse import ArgumentParser
 ### non-standard libraries
 from exposure import datafind
 from exposure import utils
+from exposure import montecarlo
 
 from skymap_statistics import detector_cache
 
 #-------------------------------------------------
 
-DEFAULT_MIN_NUM_SAMPLES = 100
-DEFAULT_ERROR = 1e-3
-
-#-------------------------------------------------
-
 parser = ArgumentParser(description=__doc__)
 
-parser.add_argument('pop_spec', type=str,
+parser.add_argument('population', type=str,
     help='the population specification config used to genreate Monte-Carlo samples. \
 This includes things like mass, spin, and redshift distributions, although we will \
 dynamically determine the maximum redshift for detectable sources given each set of PSDs.')
@@ -46,10 +42,11 @@ parser.add_argument('--max-latency', default=datafind.DEFAULT_MAX_LATENCY, type=
 parser.add_argument('--cadence', default=datafind.DEFAULT_CADENCE, type=float,
     help='the amount of time we wait between I/O queries to find frames')
 
-parser.add_argument('-N', '--min-num-samples', default=DEFAULT_MIN_NUM_SAMPLES, type=int,
+parser.add_argument('-N', '--min-num-samples', default=montecarlo.DEFAULT_MIN_NUM_SAMPLES, type=int,
     help='the minimum number of Monte-Carlo samples to be generated for each stride, independent of the "smart" termination condition')
-parser.add_argument('-f', '--fractional-systematic-error', default=DEFAULT_ERROR, type=float,
-    help='the desired fractional systematic error expected from the Monte-Carlo integral for VT based on Farr (2019): arXiv:XXX. \
+parser.add_argument('-f', '--fractional-systematic-error', default=montecarlo.DEFAULT_ERROR, type=float,
+    help='the desired fractional systematic error expected from the Monte-Carlo integral for VT based on Farr (2019): arXiv:1904.10879. \
+If not specified, we will only be limitted by --min-num-samples. \
 **NOTE**, we assume zero observations (Nobs=0) in the derrived expressions, which will only scale the actual fractional systematic error \
 approximately linearly with the actually number of observaitons.')
 
@@ -107,9 +104,8 @@ for handler in handlers:
 #-------------------------------------------------
 
 ### read in population specification
-logger.info('reading in population specifications from: '+args.pop_spec)
-
-raise NotImplementedError('read in population specification, possibly instantiate some object?')
+logger.info('reading in population specifications from: '+args.population)
+generator = montecarlo.path2generator(args.population)
 
 #-------------------------------------------------
 
@@ -169,34 +165,10 @@ while current < args.gpsstop:
 
     ### generate Monte-Carlo samples of VT
     logger.info(limittmp%tup)
-    raise NotImplementedError('''
-find maximum distance for detectable things
-    -> difficult when we use a non-central chi2 distrib to measure p(det)...
-    -> maybe just require cdf(det) to be less than some small fraction --> control the systematic error from this truncation to an acceptable level?
-
-Maybe we just Monte-Carlo at a fixed distance and determine the maximum SNR observed? With that, we can scale the maximum distance based on that fixed distance and the assumption that everything with SNR below some value has negligible probability of being detected
-''')
+    montecarlo.update_max_redshift(generator, present)
 
     logger.info(montetmp%tup)
-    N = 0
-    e1 = 0
-    e2 = 0
-    de1 = 0
-    de2 = 0
-
-    raise NotImplementedError('''***write Monte-Carlo Algorithm***
-    while (N < args.min_num_samples) and (smart termination condition not satisfied, based on args.fractional_systematic_error):
-        estimate the number of samples we want: max(args.min_num_samples, smart estimate based on args.fractional_systematic_error)
-        draw new samples
-        for sample in new samples
-            generate waveform for sample
-            snr_sqrd = sum(detector.snr(waveform)**2 for detector in present)
-            compute cdf of detectability given this snr_sqrd (should be based on a non-central chi-squared distribution)
-            update unnormalized monte-carlo sums (smart termination condition)
-            record sample, p(sample|det)
-
-    Need to define a structured array called "samples", which we write to disk in the following step
-''')
+    samples = montecarlo.montecarlo(generator, present, min_num_samples=args.min_num_samples, error=args.fractional_systematic_error)
 
     ### write samples
     samplespath = utils.samples_path(args.output_dir, args.tag, current, args.stride)
@@ -205,7 +177,7 @@ Maybe we just Monte-Carlo at a fixed distance and determine the maximum SNR obse
         os.makedirs(thatdir)
     logger.info(psdwritetmp%((samplespath,)+tup))
 
-    utils.report_psd(samplespath, samples)
+    utils.report_samples(samplespath, samples)
 
     ### increment to the next stride
     logger.info(latencytmp%((datafind.latency(current, delay=args.delay),)+tup))
