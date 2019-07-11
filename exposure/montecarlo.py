@@ -152,7 +152,7 @@ def update_montecarlo_counters(generator, event, e1, e2, de1, de2, Nparams):
     e1 += pdet
     e2 += pdet**2
     de1 += pdet*jac/pdf
-    de2 += pdet**2*jac/pdf
+    de2 += 2*pdet**2*jac/pdf
 
     return e1, e2, de1, de2
 
