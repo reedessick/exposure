@@ -132,10 +132,29 @@ find maximum distance for detectable things
 Maybe we just Monte-Carlo at a fixed distance and determine the maximum SNR observed? With that, we can scale the maximum distance based on that fixed distance and the assumption that everything with SNR below some value has negligible probability of being detected
 '''
 
-def update_montecarlo_counters(event, e1, e2, de1, de2, Nparams):
+def update_montecarlo_counters(generator, event, e1, e2, de1, de2, Nparams):
     """update the montecarlo counters for our smart termination condition
     """
-    raise NotImplementedError('return e1, e2, de1, de2')
+    # extract basic params
+    pdet = event.pdet
+
+    # compute the effective pdf and jacobian
+    pdf = 1.
+    jac = np.empty(Nparams, dtype=float)
+    i = 0
+    for gen in generator._generators:
+        variates = [getattr(event, lbl) for lbl in gen._variates]
+
+        pdf *= gen.pdf(*variates)
+        jac[i:i+len(gen._params)] = gen.jacobian(*variates)
+
+    # update the counters
+    e1 += pdet
+    e2 += pdet**2
+    de1 += pdet*jac/pdf
+    de2 += pdet**2*jac/pdf
+
+    return e1, e2, de1, de2
 
 def montecarlo(generator, network, min_num_samples=DEFAULT_MIN_NUM_SAMPLES, error=DEFAULT_ERROR):
     """generate samples from generator until we reach the termination conditions specified by min_num_samples and error
@@ -153,16 +172,14 @@ def montecarlo(generator, network, min_num_samples=DEFAULT_MIN_NUM_SAMPLES, erro
         de1 = np.zeros(Nparams, dtype=float)
         de2 = np.zeros(Nparams, dtype=float)
         for event in generator._events:
-            e1, e2, de1, de2 = update_montecarlo_counters(event, e1, e2, de1, de2, Nparams)
+            e1, e2, de1, de2 = update_montecarlo_counters(generator, event, e1, e2, de1, de2, Nparams)
 
         for event in generator.generate_events(n_iter=np.infty, n_event=np.infty, generator=True): ### go forever until we are told to stop
-            for i in range(Nparams):
-                raise NotImplementedError('check smart termination condition. If this is not satisfied, we break')
-            else:
+            if np.all(2*e1**2 * np.abs(de1) * error >= 3*np.abs(2*e2*de1 - e1*de2)):
                 break ### all smart termination conditions are satisfied, so we break the broader iteration
 
             ### update monte-carlo sums
-            e1, e2, de1, de2 = update_montecarlo_counters(event, e1, e2, de1, de2, Nparams)
+            e1, e2, de1, de2 = update_montecarlo_counters(generator, event, e1, e2, de1, de2, Nparams)
 
     ### format the samples into a numpy structured array compatible with writing to disk
     attrs = sorted(generator.attributes)
