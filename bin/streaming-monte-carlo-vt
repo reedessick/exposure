@@ -119,7 +119,7 @@ celest2geo = False
 for trans in generator._transforms:
     if isinstance(trans, eventgen.Pdet):
         raise RuntimeError('please do not specify Pdet within %s; this will be instantiated separately'%args.population)
-    celest2geo += isinstance(trans, event.Celestial2Geographic):
+    celest2geo += isinstance(trans, event.Celestial2Geographic)
 generator.append_transform(eventgen.Pdet(network, snr_thr=args.snr_threshold))
 if not celest2geo:
     generator.append_transform(eventgen.Celestial2Geographic())
@@ -185,7 +185,7 @@ while current < args.gpsstop:
 
     ### generate Monte-Carlo samples of VT
     logger.info(limittmp%tup)
-    montecarlo.update_max_redshift(generator, network
+    montecarlo.update_max_redshift(generator, network)
 
     logger.info(montetmp%tup)
     samples = montecarlo.montecarlo(generator, network, min_num_samples=args.min_num_samples, error=args.fractional_systematic_error)
