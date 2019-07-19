@@ -135,7 +135,7 @@ def segs_path(output_dir, tag, gpsstart, gpsdur):
 def psd_path(output_dir, tag, gpsstart, gpsdur):
     return "%s/psd%s-%d-%d.csv.gz"%(gps2dir(output_dir, gpsstart, gpsdur), tag, gpsstart, gpsdur)
 
-def samples_path(output_dir, tag, gps, gpsdur):
+def samples_path(output_dir, tag, gpsstart, gpsdur):
     return "%s/samples%s-%d-%d.csv.gz"%(gps2dir(output_dir, gpsstart, gpsdur), tag, gpsstart, gpsdur)
 
 def horizon_path(output_dir, tag, gpstart, gpsdur):
@@ -167,7 +167,7 @@ def retrieve_psd(path):
     """read the PSD from disk
     return freqs, psd
     """
-    ans = np.loadtxt(path, delimiter=',', names=True)
+    ans = np.genfromtxt(path, delimiter=',', names=True)
     return ans['frequency'], ans['psd']
 
 def report_segs(path, new_segs):

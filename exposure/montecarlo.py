@@ -31,7 +31,7 @@ def subclasses(klass):
 
 def parse(section, config):
     ans = dict()
-    for k in config.options():
+    for k in config.options(section):
         try: ### maybe it's an integer
             ans[k] = config.getint(section, k)
             continue
@@ -39,7 +39,7 @@ def parse(section, config):
             pass
 
         try: ### maybe a float
-            ans[k] = config.getint(section, k)
+            ans[k] = config.getfloat(section, k)
             continue
         except ValueError:
             pass
@@ -78,6 +78,7 @@ def path2generator(path):
     attributetransformations = subclasses(eventgen.AttributeTransformation)
 
     # add generators
+    timedistribution = None
     for name in config.get('general', 'generators').split(): ### iterate through generators
         for parent in samplingdistributions[name].__bases__:
             if parent in gentypes: ### check to make sure we haven't repeated anything
@@ -87,34 +88,43 @@ def path2generator(path):
         gen = samplingdistributions[name](**parse(name, config))
         generator.append_generator(gen)
 
+        if isinstance(gen, eventgen.TimeDistribution):
+            timedistribution = gen
+
+    if timedistribution is None:
+        timedistribution = eventgen.UniformEventTime(t0=0, dur=10)
+        generator.append_generator(timedistribution)
+        for parent in eventgen.UniformEventTime.__bases__:
+            gentypes.add(parent)
+
     ### figure out whether we have enough different types of generators
     ### includes declaring required transformations
     # check for things that *must* be specified
-    for gentype in [eventgen.TimeDistribution, eventgen.MassDistribution, eventgen.SpinDistribution, eventgen.OrientationDistribution]:
+    for gentype in [eventgen.TimeDistribution, eventgen.MassDistribution, eventgen.SpinDistribution, eventgen.OrientationDistribution, eventgen.EccentricityDistribution]:
         if gentype not in gentypes:
             raise RuntimeError('must specify an instance of %s!'%gentype.__name__)
-
     # check for things that may be specified in several ways
     required_transforms = []
     if eventgen.DistanceDistribution in gentypes:
         if eventgen.RedshiftDistribution in gentypes:
             raise RuntimeError('cannot specify both DistanceDistribution and RedshiftDistribution!')
     elif eventgen.RedshiftDistribution in gentypes:
-        required_transforms.append(eventgen.Redshift2LuminosityDistance) ### must include transformation from redshift to distance
+        required_transforms.append(eventgen.Redshift2LuminosityDistance.__name__) ### must include transformation from redshift to distance
     else:
         raise RuntimeError('must specify either DistanceDistribution or RedshiftDistribution!')
 
     # add attribute transformations
-    for name in config.get('general', 'transforms').split(): ### iterate through transforms
-        if name in required_transforms:
-            required_transforms.remove(name)
-        trans = attributetransformations[name]() ### FIXME: some of these take in arguments...
-        generator.append_transform(trans)
+    if config.has_option('general', 'transforms'):
+        for name in config.get('general', 'transforms').split(): ### iterate through transforms
+            if name in required_transforms:
+                required_transforms.remove(name)
+            trans = attributetransformations[name]() ### FIXME: some of these take in arguments...
+            generator.append_transform(trans)
 
     if required_transforms:
         raise RuntimeError('required AttributeTransformation (%s) not specified!'%(', '.join(required_transforms)))
 
-    return generator
+    return generator, timedistribution
 
 #-------------------------------------------------
 
@@ -162,7 +172,8 @@ def montecarlo(generator, network, min_num_samples=DEFAULT_MIN_NUM_SAMPLES, erro
     """generate samples from generator until we reach the termination conditions specified by min_num_samples and error
     """
     ### generate the minimum number of samples required
-    generator.generate_events(n_iter=np.infty, n_event=min_num_samples, generator=False) ### just store these quietly internally
+    for event in generator.generate_events(n_itr=np.infty, n_event=min_num_samples):
+        pass
 
     # figure out whether we want to even attempt the "smart termination condition"
     if error!=np.infty:
@@ -176,7 +187,7 @@ def montecarlo(generator, network, min_num_samples=DEFAULT_MIN_NUM_SAMPLES, erro
         for event in generator._events:
             e1, e2, de1, de2 = update_montecarlo_counters(generator, event, e1, e2, de1, de2, Nparams)
 
-        for event in generator.generate_events(n_iter=np.infty, n_event=np.infty, generator=True): ### go forever until we are told to stop
+        for event in generator.generate_events(n_itr=np.infty, n_event=np.infty, generator=True): ### go forever until we are told to stop
             if np.all(2*e1**2 * np.abs(de1) * error >= 3*np.abs(2*e2*de1 - e1*de2)):
                 break ### all smart termination conditions are satisfied, so we break the broader iteration
 
