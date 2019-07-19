@@ -195,5 +195,5 @@ def montecarlo(generator, network, min_num_samples=DEFAULT_MIN_NUM_SAMPLES, erro
             e1, e2, de1, de2 = update_montecarlo_counters(generator, event, e1, e2, de1, de2, Nparams)
 
     ### format the samples into a numpy structured array compatible with writing to disk
-    attrs = sorted(generator.attributes)
-    return np.array([[getattr(event, attr) for attr in attrs] for event in generator._events], dtype=[(attr, float) for attr in attrs])
+    attrs = [(attr, 'float') for attr in sorted(generator.attributes)]
+    return np.array([tuple(float(getattr(event, attr)) for attr, _ in attrs) for event in generator._events], dtype=attrs)
