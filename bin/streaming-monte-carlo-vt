@@ -165,6 +165,7 @@ while current < args.gpsstop:
     for det in network._instr:
         network.remove(det)
 
+    datafind.wait(future, delay=args.delay, logger=logger)
     for ifo, rootdir, tag in args.source:
         psdpath = utils.psd_path(rootdir, tag, current, args.stride)
         logger.info(psdtmps[ifo]%tup)
@@ -208,6 +209,9 @@ while current < args.gpsstop:
     logger.info(sampleswritetmp%((samplespath,)+tup))
 
     utils.report_samples(samplespath, samples)
+
+    ### get rid of samples
+    generator.flush()
 
     ### increment to the next stride
     logger.info(latencytmp%((datafind.latency(current, delay=args.delay),)+tup))

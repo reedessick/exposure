@@ -161,7 +161,11 @@ def extract_start_dur(path, suffix='.gwf'):
 def report_psd(path, freqs, psd):
     """writes the PSD to disk
     """
-    np.savetxt(path, np.array(zip(freqs, psd)), comments='', delimiter=',', header='frequency,psd')
+    ### save to a temporary file
+    tmp = os.path.join(os.path.dirname(path), '.'+os.path.basename(path))
+    np.savetxt(tmp, np.array(zip(freqs, psd)), comments='', delimiter=',', header='frequency,psd')
+    ### move to the final location
+    os.system('mv %s %s'%(tmp, path))
 
 def retrieve_psd(path):
     """read the PSD from disk
@@ -198,8 +202,11 @@ def report_segs(path, new_segs):
     else:
         segs = new_segs
 
-    ### write the result back out
-    np.savetxt(path, segs, fmt='%d')
+    ### write the result back out to a temporary location
+    tmp = os.path.join(os.path.dirname(path), '.'+os.path.basename(path))
+    np.savetxt(tmp, segs, fmt='%d')
+    ### move to final location
+    os.system('mv %s %s'%(tmp, path))
 
 def retrieve_segs(path):
     """retrieves segments from disk
@@ -210,7 +217,11 @@ def report_samples(path, samples):
     """reports samples to disk. Assumes samples is a structured numpy.ndarray and saves it into a CSV file
     """
     names = samples.dtype.names
-    np.savetxt(path, np.array(zip(*[samples[name] for name in names])), comments='', delimiter=',', header=','.join(names))
+    ### write the result to a temporary location
+    tmp = os.path.join(os.path.dirname(path), '.'+os.path.basename(path))
+    np.savetxt(tmp, np.array(zip(*[samples[name] for name in names])), comments='', delimiter=',', header=','.join(names))
+    ### move to final location
+    os.system('mv %s %s'%(tmp, path))
 
 def retrieve_samples(path):
     """retrieves samples from disk
