@@ -151,7 +151,7 @@ def extract_scisegs(frames, channel, bits, start, stride, verbose=False):
         return []
 
     ### clean up segs!
-    return andsegments(mergesegments(segset), [(start, start+stride)])
+    return utils.andsegments(utils.mergesegments(segset), [(start, start+stride)])
 
 #------------------------
 
