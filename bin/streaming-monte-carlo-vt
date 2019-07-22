@@ -178,22 +178,31 @@ while current < args.gpsstop:
     for ifo, rootdir, tag, required in args.source:
         psdpath = utils.psd_path(rootdir, tag, current, args.stride)
         logger.info(psdtmps[ifo]%tup)
-        while datafind.latency(current, delay=args.delay) < args.max_latency:
-            if os.path.exists(psdpath):
-                logger.info(updatetmp%((ifo, psdpath,)+tup))
-                freqs, psd = utils.retrieve_psd(psdpath) ### read from disk
-                det = detector_cache.detectors[ifo]
-                det.psd.update(psd, freqs=freqs) ### update object in place 
-                network.add(det) ### append object to list of dectors for which we found data
-                break
-            else:
-                datafind.sleep(args.cadence)
+        if os.path.exists(psdpath):
+            logger.info(updatetmp%((ifo, psdpath,)+tup))
+            freqs, psd = utils.retrieve_psd(psdpath) ### read from disk
+            det = detector_cache.detectors[ifo]
+            det.psd.update(psd, freqs=freqs) ### update object in place 
+            network.add(det) ### append object to list of dectors for which we found data
+
         else:
-            logger.warn(timeouttmps[ifo]%tup)
-            if required:
-                logger.warn(requiredtmp[ifo]%tup)
-                current = future
-                break
+            while datafind.latency(current, delay=args.delay) < args.max_latency:
+                if os.path.exists(psdpath):
+                    logger.info(updatetmp%((ifo, psdpath,)+tup))
+                    freqs, psd = utils.retrieve_psd(psdpath) ### read from disk
+                    det = detector_cache.detectors[ifo]
+                    det.psd.update(psd, freqs=freqs) ### update object in place 
+                    network.add(det) ### append object to list of dectors for which we found data
+                    break
+                else:
+                    datafind.sleep(args.cadence)
+
+            else:
+                logger.warn(timeouttmps[ifo]%tup)
+                if required:
+                    logger.warn(requiredtmp[ifo]%tup)
+                    current = future
+                    break
 
     else: ### did not break because of a missing required PSD
         if len(network._instr) < args.min_num_present:
