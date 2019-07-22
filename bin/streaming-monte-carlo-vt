@@ -219,10 +219,18 @@ while current < args.gpsstop:
         timedistribution._dur = args.stride
 
         logger.info(limittmp%tup)
-        montecarlo.update_max_redshift(generator, network)
+        generator.update_max_redshift(network)
 
         logger.info(montetmp%tup)
-        samples = montecarlo.montecarlo(generator, network, min_num_samples=args.min_num_samples, error=args.fractional_systematic_error)
+        for event in generator.generate_events(min_num_samples=args.min_num_samples, error=args.fractional_systematic_error):
+            pass
+
+        ### FIXME: eventually, delegate to eventgen I/O libraries for this
+        attrs = [(attr, 'S50' if attr=='approximant' else 'float') for attr in sorted(generator.attributes)+sorted(eventgen.Event._waveattrs)]
+        samples = np.array(
+            [tuple(getattr(event, attr) for attr, _ in attrs)+(generator.pdf(event),) for event in generator._events],
+            dtype=attrs+[('pdf', float)],
+        )
 
         ### write samples
         samplespath = utils.samples_path(args.output_dir, args.tag, current, args.stride)
