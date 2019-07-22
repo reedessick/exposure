@@ -198,4 +198,4 @@ def montecarlo(generator, network, min_num_samples=DEFAULT_MIN_NUM_SAMPLES, erro
 
     ### format the samples into a numpy structured array compatible with writing to disk
     attrs = [(attr, 'S50' if attr=='approximant' else 'float') for attr in sorted(generator.attributes)+sorted(eventgen.Event._waveattrs)]
-    return np.array([tuple(getattr(event, attr) for attr, _ in attrs) for event in generator._events], dtype=attrs)
+    return np.array([tuple(getattr(event, attr) for attr, _ in attrs)+(generator.pdf(event),) for event in generator._events], dtype=attrs+[('pdf', float)])
