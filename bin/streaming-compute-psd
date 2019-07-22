@@ -12,6 +12,8 @@ from logging.handlers import TimedRotatingFileHandler
 
 import numpy as np
 
+from collections import defaultdict
+
 from argparse import ArgumentParser
 
 ### non-standard libraries
@@ -71,9 +73,9 @@ if args.gpsstart is None:
 if args.gpsstop is None:
     args.gpsstop = np.infty
 
-segs_channel_bitmask = defaultdict(list)
-for channel, bit in args.segs_channel_bitmask:
-    segs_channel_bitmask[channel].append(int(bit))
+segs_channel_bits = defaultdict(list)
+for channel, bit in args.segs_channel_bit:
+    segs_channel_bits[channel].append(int(bit))
 
 if args.tag:
     args.tag = "_"+args.tag
@@ -127,7 +129,7 @@ timeouttmp = 'latency exceeded maximum value (%.3f sec)!'%args.max_latency +' Sk
 foundtmp = 'found %d frames within [%d, %d).'
 
 segstmp = 'extracting segments from %s with bits %s active'
-segstmp = dict((channel, segstmp%(segs_channel, ','.join('%d'%_ for _ in segs_bits))+' within [%d, %d).') for segs_channel, segs_bits in segs_channel_bitmask)
+segstmp = dict((channel, segstmp%(segs_channel, ','.join('%d'%_ for _ in segs_bits))+' within [%d, %d).') for segs_channel, segs_bits in segs_channel_bits.items())
 segswritetmp = 'writing segments to %s for [%d, %d)'
 coveragetmp = 'segment not completely covered! Skipping data within [%d, %d).'
 
@@ -168,9 +170,9 @@ while current < args.gpsstop:
 
     ### read in data to extract science segments
     segs = [(current, future)]
-    for segs_channel, segs_bits in segs_channel_bitmask.items():
-        logger.info(segstmp[segs_channel]%+tup)
-        segs = utils.andsegments(datafind.extract_scisegs(frames, segs_channel, seg_bits, current, args.stride), segs)
+    for segs_channel, segs_bits in segs_channel_bits.items():
+        logger.info(segstmp[segs_channel]%tup)
+        segs = utils.andsegments(datafind.extract_scisegs(frames, segs_channel, segs_bits, current, args.stride), segs)
 
     # write segments
     segspath = utils.segs_path(args.output_dir, args.tag, current, args.stride)
