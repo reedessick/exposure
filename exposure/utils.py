@@ -178,35 +178,36 @@ def report_segs(path, new_segs):
     """reads in the segments contained in path and appends the current seg of segs to them
     assumes you are only adding segments in time order, so it will either start a new segment or merge the last segment in the file
     """
-    new_segs = [(a,b) for a, b in new_segs] ### make a copy so we don't mess up a shared reference
+    if len(new_segs): ### there must be something to report...
+        new_segs = [(a,b) for a, b in new_segs] ### make a copy so we don't mess up a shared reference
 
-    ### read in and merge segs if necessary
-    if os.path.exists(path):
-        segs = retrieve_segs(path)
-        if len(segs):
-            if np.ndim(segs)==1: ### a single segment
-                segs = [segs]
-
-            while len(segs) and (segs[-1][0] > new_segs[0][1]): ### remove existing segs that are redundant with where new_segs starts
-                segs.pop(-1)
-
+        ### read in and merge segs if necessary
+        if os.path.exists(path):
+            segs = retrieve_segs(path)
             if len(segs):
-                if (segs[-1][1] >= new_segs[0][0]): ### these things overlap
-                    segs[-1][1] = new_segs.pop(0)[1] ### remove the first element from segs
+                if np.ndim(segs)==1: ### a single segment
+                    segs = [segs]
 
-            segs = segs+list(new_segs)
+                while len(segs) and (segs[-1][0] > new_segs[0][1]): ### remove existing segs that are redundant with where new_segs starts
+                    segs.pop(-1)
 
-        else: ### either empty or a single se
+                if len(segs):
+                    if (segs[-1][1] >= new_segs[0][0]): ### these things overlap
+                        segs[-1][1] = new_segs.pop(0)[1] ### remove the first element from segs
+
+                segs = segs+list(new_segs)
+
+            else: ### either empty or a single se
+                segs = new_segs
+
+        else:
             segs = new_segs
 
-    else:
-        segs = new_segs
-
-    ### write the result back out to a temporary location
-    tmp = os.path.join(os.path.dirname(path), '.'+os.path.basename(path))
-    np.savetxt(tmp, segs, fmt='%d')
-    ### move to final location
-    os.system('mv %s %s'%(tmp, path))
+        ### write the result back out to a temporary location
+        tmp = os.path.join(os.path.dirname(path), '.'+os.path.basename(path))
+        np.savetxt(tmp, segs, fmt='%d')
+        ### move to final location
+        os.system('mv %s %s'%(tmp, path))
 
 def retrieve_segs(path):
     """retrieves segments from disk
