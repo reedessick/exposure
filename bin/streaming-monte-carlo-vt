@@ -41,6 +41,11 @@ parser.add_argument('-s', '--source', default=[], required=True, nargs=3, type=s
 parser.add_argument('--snr-threshold', default=DEFAULT_SNR_THRESHOLD, type=float,
     help='the network SNR threshold for detection. Used within gw_event_gen.eventgen.Pdet to determine the probability of detecting a signal')
 
+parser.add_argument('-r', '--require', default=[], type=str, action='append',
+    help='require the PSD from this IFO to be present. Can be repeated to require multiple IFOs')
+parser.add_argument('--min-num-present', default=1, type=int,
+    help='the minimum number of PSDs that must be present to process a stride')
+
 parser.add_argument('--stride', default=datafind.DEFAULT_STRIDE, type=int,
     help='the stride over which PSDs are cacluated. **NOTE**, this must match the stride with which all PSDs are generated.')
 parser.add_argument('--delay', default=datafind.DEFAULT_DELAY, type=int,
@@ -68,6 +73,8 @@ parser.add_argument('--tag', default='', type=str)
 
 args = parser.parse_args()
 
+assert args.min_num_present >= 1, 'must require at least 1 PSD to be present'
+
 if args.gpsstart is None:
     args.gpsstart = int(datafind.tconvert())
 
@@ -77,14 +84,14 @@ if args.gpsstop is None:
 if args.tag:
     args.tag = "_"+args.tag
 
-args.source = [(ifo, rootdir, '_'+tag) for ifo, rootdir, tag in args.source]
+args.source = [(ifo, rootdir, '_'+tag, ifo in args.require) for ifo, rootdir, tag in args.source]
 
 if not os.path.exists(args.output_dir):
     os.makedirs(args.output_dir)
 
 #------------------------
 
-for ifo, _, _ in args.source:
+for ifo, _, _, _ in args.source:
     assert ifo in detector_cache.detectors, 'ifo=%s not a known detector! known detectors are %s'%(ifo, ', '.join(detector_cache.detectors.keys()))
 
 #-------------------------------------------------
@@ -134,15 +141,17 @@ generator.append_transform(eventgen.Pdet(network, snr_thr=args.snr_threshold)) #
 infotmp = 'processing data within [%d, %d).'
 
 psdtmp = 'searching for PSD for %s with rootdir=%s, tag=%s'
-psdtmps = dict((ifo, psdtmp%(ifo, rootdir, tag) + ' within [%d, %d).') for ifo, rootdir, tag in args.source)
+psdtmps = dict((ifo, psdtmp%(ifo, rootdir, tag) + ' within [%d, %d).') for ifo, rootdir, tag, _ in args.source)
 
 updatetmp = 'updating PSD for %s from %s for data within [%d, %d).'
 
 timeouttmp = 'latency exceeded maximum value (%.3f sec) while searching for PSD from %s!'
-timeouttmps = dict((ifo, timeouttmp%(args.max_latency, ifo)+' Skipping data within [%d, %d).') for ifo, _, _ in args.source)
+timeouttmps = dict((ifo, timeouttmp%(args.max_latency, ifo)+' Skipping data within [%d, %d).') for ifo, _, _, _ in args.source)
 
-missingtmp = 'no PSD found for any IFO. Skipping data within [%d, %d).'
+missingtmp = 'found fewer than %d PSDs.'%args.min_num_present + ' Skipping data within [%d, %d).'
 foundtmp = 'found PSDs for %d IFOs (%s) within [%d, %d).'
+requiredtmp = 'PSD for %s required but not found. Skipping data within'
+requriedtmp = dict((ifo, requiredtmp%ifo +' [%d, %d).') for ifo, _, _, _ in args.source)
 
 durtmp = 'updating TimeDistribution to reflect current stride: [%d, %d).'
 limittmp = 'determining appropriate maximum horizon distance for data within [%d, %d).'
@@ -166,7 +175,7 @@ while current < args.gpsstop:
         network.remove(det)
 
     datafind.wait(future, delay=args.delay, logger=logger)
-    for ifo, rootdir, tag in args.source:
+    for ifo, rootdir, tag, required in args.source:
         psdpath = utils.psd_path(rootdir, tag, current, args.stride)
         logger.info(psdtmps[ifo]%tup)
         while datafind.latency(current, delay=args.delay) < args.max_latency:
@@ -181,38 +190,43 @@ while current < args.gpsstop:
                 datafind.sleep(args.cadence)
         else:
             logger.warn(timeouttmps[ifo]%tup)
+            if required:
+                logger.warn(requiredtmp[ifo]%tup)
+                current = future
+                break
 
-    if not network._instr:
-        logger.warn(missingtmp%tup)
-        current = future ### bump to next stride
-        continue
+    else: ### did not break because of a missing required PSD
+        if len(network._instr) < args.min_num_present:
+            logger.warn(missingtmp%tup)
+            current = future ### bump to next stride
+            continue
 
-    # Note: we can only get here if we have at least one active detector
-    logger.info(foundtmp%((len(network), ', '.join(network._instr))+tup))
+        # Note: we can only get here if we have at least one active detector
+        logger.info(foundtmp%((len(network), ', '.join(network._instr))+tup))
 
-    ### generate Monte-Carlo samples of VT
-    logger.info(durtmp%tup)
-    timedistribution._t0 = current
-    timedistribution._dur = args.stride
+        ### generate Monte-Carlo samples of VT
+        logger.info(durtmp%tup)
+        timedistribution._t0 = current
+        timedistribution._dur = args.stride
 
-    logger.info(limittmp%tup)
-    montecarlo.update_max_redshift(generator, network)
+        logger.info(limittmp%tup)
+        montecarlo.update_max_redshift(generator, network)
 
-    logger.info(montetmp%tup)
-    samples = montecarlo.montecarlo(generator, network, min_num_samples=args.min_num_samples, error=args.fractional_systematic_error)
+        logger.info(montetmp%tup)
+        samples = montecarlo.montecarlo(generator, network, min_num_samples=args.min_num_samples, error=args.fractional_systematic_error)
 
-    ### write samples
-    samplespath = utils.samples_path(args.output_dir, args.tag, current, args.stride)
-    thatdir = os.path.dirname(samplespath)
-    if not os.path.exists(thatdir):
-        os.makedirs(thatdir)
-    logger.info(sampleswritetmp%((samplespath,)+tup))
+        ### write samples
+        samplespath = utils.samples_path(args.output_dir, args.tag, current, args.stride)
+        thatdir = os.path.dirname(samplespath)
+        if not os.path.exists(thatdir):
+            os.makedirs(thatdir)
+        logger.info(sampleswritetmp%((samplespath,)+tup))
 
-    utils.report_samples(samplespath, samples)
+        utils.report_samples(samplespath, samples)
 
-    ### get rid of samples
-    generator.flush()
+        ### get rid of samples
+        generator.flush()
 
-    ### increment to the next stride
-    logger.info(latencytmp%((datafind.latency(current, delay=args.delay),)+tup))
-    current = future
+        ### increment to the next stride
+        logger.info(latencytmp%((datafind.latency(current, delay=args.delay),)+tup))
+        current = future

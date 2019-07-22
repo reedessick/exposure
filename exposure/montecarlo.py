@@ -103,11 +103,13 @@ def path2generator(path):
     for gentype in [eventgen.TimeDistribution, eventgen.MassDistribution, eventgen.SpinDistribution, eventgen.OrientationDistribution, eventgen.EccentricityDistribution]:
         if gentype not in gentypes:
             raise RuntimeError('must specify an instance of %s!'%gentype.__name__)
+
     # check for things that may be specified in several ways
-    required_transforms = []
+    required_transforms = [eventgen.SourceMass2DetectorMass.__name__] ### always require this transformation
     if eventgen.DistanceDistribution in gentypes:
         if eventgen.RedshiftDistribution in gentypes:
             raise RuntimeError('cannot specify both DistanceDistribution and RedshiftDistribution!')
+        required_transforms.append(eventgen.LuminosityDistance2Redshift.__name__) ### must include transformation from distance to redshift
     elif eventgen.RedshiftDistribution in gentypes:
         required_transforms.append(eventgen.Redshift2LuminosityDistance.__name__) ### must include transformation from redshift to distance
     else:
@@ -195,5 +197,5 @@ def montecarlo(generator, network, min_num_samples=DEFAULT_MIN_NUM_SAMPLES, erro
             e1, e2, de1, de2 = update_montecarlo_counters(generator, event, e1, e2, de1, de2, Nparams)
 
     ### format the samples into a numpy structured array compatible with writing to disk
-    attrs = [(attr, 'float') for attr in sorted(generator.attributes)]
-    return np.array([tuple(float(getattr(event, attr)) for attr, _ in attrs) for event in generator._events], dtype=attrs)
+    attrs = [(attr, 'S50' if attr=='approximant' else 'float') for attr in sorted(generator.attributes)+sorted(eventgen.Event._waveattrs)]
+    return np.array([tuple(getattr(event, attr) for attr, _ in attrs) for event in generator._events], dtype=attrs)

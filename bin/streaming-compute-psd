@@ -52,8 +52,9 @@ parser.add_argument("--tukey-alpha", default=dft.DEFAULT_TUKEY_ALPHA, type=float
 parser.add_argument('--gpsstart', type=float, default=None)
 parser.add_argument('--gpsstop', type=float, default=None)
 
-parser.add_argument('--segs-channel-bitmask', default=[], nargs=2, type=str, action='append',
-    help='channel and bitmask pairs used to define science segments. eg, "--segs-channel-bitmask H1:GDS-CALIB_STATE 8". can be repeated.')
+parser.add_argument('--segs-channel-bit', default=[], nargs=2, type=str, action='append',
+    help='channel and bit pairs used to define science segments. Bits are required to be active (1, not 0). \
+eg, "--segs-channel-bitmask H1:GDS-CALIB_STATE 8". can be repeated.')
 
 parser.add_argument('-v', '--verbose', default=False, action='store_true')
 
@@ -70,7 +71,9 @@ if args.gpsstart is None:
 if args.gpsstop is None:
     args.gpsstop = np.infty
 
-args.segs_channel_bitmask = [(channel, int(bitmask)) for channel, bitmask in args.segs_channel_bitmask]
+segs_channel_bitmask = defaultdict(list)
+for channel, bit in args.segs_channel_bitmask:
+    segs_channel_bitmask[channel].append(int(bit))
 
 if args.tag:
     args.tag = "_"+args.tag
@@ -123,7 +126,8 @@ timeouttmp = 'latency exceeded maximum value (%.3f sec)!'%args.max_latency +' Sk
 #foundtmp = 'found %d frames within [%d, %d): %s.'
 foundtmp = 'found %d frames within [%d, %d).'
 
-segstmp = 'extracting segments from %s with bitmask %d within [%d, %d).'
+segstmp = 'extracting segments from %s with bits %s active'
+segstmp = dict((channel, segstmp%(segs_channel, ','.join('%d'%_ for _ in segs_bits))+' within [%d, %d).') for segs_channel, segs_bits in segs_channel_bitmask)
 segswritetmp = 'writing segments to %s for [%d, %d)'
 coveragetmp = 'segment not completely covered! Skipping data within [%d, %d).'
 
@@ -164,9 +168,9 @@ while current < args.gpsstop:
 
     ### read in data to extract science segments
     segs = [(current, future)]
-    for segs_channel, segs_bitmask in args.segs_channel_bitmask:
-        logger.info(segstmp%((segs_channel, segs_bitmask,)+tup))
-        segs = utils.andsegments(datafind.extract_scisegs(frames, args.segs_channel, args.seg_bitmask, current, args.stride), segs)
+    for segs_channel, segs_bits in segs_channel_bitmask.items():
+        logger.info(segstmp[segs_channel]%+tup)
+        segs = utils.andsegments(datafind.extract_scisegs(frames, segs_channel, seg_bits, current, args.stride), segs)
 
     # write segments
     segspath = utils.segs_path(args.output_dir, args.tag, current, args.stride)

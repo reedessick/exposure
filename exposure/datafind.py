@@ -110,7 +110,7 @@ def vec_from_frames(frames, channel, start, stop, verbose=False):
     vec = np.concatenate(vecs)
     return vec, dt
 
-def extract_scisegs(frames, channel, bitmask, start, stride, verbose=False):
+def extract_scisegs(frames, channel, bits, start, stride, verbose=False):
     """
     extract scisegs from channel in frames using bitmask
     """
@@ -126,8 +126,12 @@ def extract_scisegs(frames, channel, bitmask, start, stride, verbose=False):
     t = np.arange(0, dt*n, dt) + start
 
     ### determine whether state acceptable
+    truth = np.ones(n, dtype=bool)
+    for bit in bits:
+        truth *= (vec >> bit) & 1 ### require each bit to active in turn
+
     ### add "False" buffers to set up the computation of start and end time
-    state = np.concatenate( ([False], (vec >> bitmask) & 1, [False])) ### bitwise operation
+    state = np.concatenate( ([False], truth, [False])) ### bitwise operation
 
     ### determine beginning of segments
     ###      i=False      i+1 = True  strip the trailing buffer
