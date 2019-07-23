@@ -219,10 +219,11 @@ while current < args.gpsstop:
         timedistribution._dur = args.stride
 
         logger.info(limittmp%tup)
-        montecarlo.update_max_redshift(generator, network)
+        generator.update_max_redshift(network)
 
         logger.info(montetmp%tup)
-        samples = montecarlo.montecarlo(generator, network, min_num_samples=args.min_num_samples, error=args.fractional_systematic_error)
+        for event in generator.generate_events(min_num_samples=args.min_num_samples, error=args.fractional_systematic_error):
+            pass
 
         ### write samples
         samplespath = utils.samples_path(args.output_dir, args.tag, current, args.stride)
@@ -231,7 +232,8 @@ while current < args.gpsstop:
             os.makedirs(thatdir)
         logger.info(sampleswritetmp%((samplespath,)+tup))
 
-        utils.report_samples(samplespath, samples)
+        attrs = sorted(generator.attributes)+sorted(eventgen.Event._waveattrs)
+        eventgen.events2csv(generator._events, attrs, samplespath) ### use the I/O defined within eventgen to make this consistent with that library
 
         ### get rid of samples
         generator.flush()
