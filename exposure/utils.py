@@ -214,22 +214,6 @@ def retrieve_segs(path):
     """
     return list(np.loadtxt(path))
 
-def report_samples(path, samples):
-    """reports samples to disk. Assumes samples is a structured numpy.ndarray and saves it into a CSV file
-    """
-    names = samples.dtype.names
-    fmt = ','.join('%s' if name=='approximant' else '%.18e' for name in names) ### NOTE, includes delimiter
-    ### write the result to a temporary location
-    tmp = os.path.join(os.path.dirname(path), '.'+os.path.basename(path))
-    np.savetxt(tmp, samples, comments='', header=','.join(names), fmt=fmt)
-    ### move to final location
-    os.system('mv %s %s'%(tmp, path))
-
-def retrieve_samples(path):
-    """retrieves samples from disk
-    """
-    return np.genfromtxt(path, names=True, delimiter=',')
-
 #-------------------------------------------------
 
 def andsegments(list1, list2):
