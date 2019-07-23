@@ -225,13 +225,6 @@ while current < args.gpsstop:
         for event in generator.generate_events(min_num_samples=args.min_num_samples, error=args.fractional_systematic_error):
             pass
 
-        ### FIXME: eventually, delegate to eventgen I/O libraries for this
-        attrs = [(attr, 'S50' if attr=='approximant' else 'float') for attr in sorted(generator.attributes)+sorted(eventgen.Event._waveattrs)]
-        samples = np.array(
-            [tuple(getattr(event, attr) for attr, _ in attrs)+(generator.pdf(event),) for event in generator._events],
-            dtype=attrs+[('pdf', float)],
-        )
-
         ### write samples
         samplespath = utils.samples_path(args.output_dir, args.tag, current, args.stride)
         thatdir = os.path.dirname(samplespath)
@@ -239,7 +232,8 @@ while current < args.gpsstop:
             os.makedirs(thatdir)
         logger.info(sampleswritetmp%((samplespath,)+tup))
 
-        utils.report_samples(samplespath, samples)
+        attrs = sorted(generator.attributes)+sorted(eventgen.Event._waveattrs)
+        eventgen.events2csv(generator._events, attrs, samplespath) ### use the I/O defined within eventgen to make this consistent with that library
 
         ### get rid of samples
         generator.flush()
