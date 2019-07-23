@@ -4,8 +4,12 @@ __author__ = "Reed Essick (reed.essick@gmail.com)"
 
 #-------------------------------------------------
 
+import os
+import glob
+
 import numpy as np
 
+from . import utils
 from gw_event_gen import eventgen
 
 try:
@@ -88,3 +92,41 @@ def path2generator(path):
             transforms.append(trans)
 
     return eventgen.MonteCarloIntegrator(generators=generators, transforms=transforms), timedistribution
+
+#-------------------------------------------------
+
+### I/O and downsampling utilities
+
+def glob_samples(rootdir, tag, start, stop, downsample=1):
+    """find all samples within [start, stop) contained within rootdir with tag. return a subset, keeping one out of every `downsample` samples
+    """
+    # find the integer top-level directory labels for the relevant time range
+    intstart = int(start)/utils.MOD_STRIDE
+    intstop = int(stop)/utils.MOD_STRIDE
+
+    segs = [[start, stop]]
+
+    events = []
+    prob = 1./downsample ### probability of keeping any individual sample
+    ### iterate over top-level directories
+    for directory in glob.glob('%s/*'%rootdir):
+        inttime = int(os.path.basename(directory))
+        if (intstart<=inttime) and (inttime<=intstop): ### there is some overlap
+            ### iterate over sub-directories
+            for subdirectory in glob.glob('%s/*-*'%directory):
+                substart, subdur = [int(_) for _ in subdirectory.split('-')]
+                intersection = utils.andsegments(segs, [[substart, substart+subdur]]) ### figure out whether this is relevant data
+                if intersection: ### there is some overlap
+                    path = utils.samples_path(rootdir, tag, substart, subdur) ### predict path
+                    if os.path.exists(path):
+                        events = eventgen.csv2events(path) ### load samples
+                        rand = np.random.random(len(events))<=prob ### boolean array, true for events that we keep
+
+                        ### throw away anything that is not included in the relevant window
+                        substart, substop = intersection[0]
+                        for event, keep in zip(events, rand):
+                            if keep and (substart<=event.time) and (event.time<=substop):
+                                events.append(event)
+
+    ### return the final list
+    return events
