@@ -26,13 +26,6 @@ DEFAULT_ERROR = np.infty
 
 ### basic config parsing
 
-def subclasses(klass):
-    ans = dict()
-    for obj in klass.__subclasses__():
-        ans[obj.__name__] = obj
-        ans.update(subclasses(obj))
-    return ans
-
 def parse(section, config):
     ans = dict()
     for k in config.options(section):
@@ -67,8 +60,8 @@ def path2generator(path):
     config = ConfigParser()
     config.read(path)
 
-    samplingdistributions = subclasses(eventgen.SamplingDistribution)
-    attributetransformations = subclasses(eventgen.AttributeTransformation)
+    samplingdistributions = eventgen.subclasses(eventgen.SamplingDistribution)
+    attributetransformations = eventgen.subclasses(eventgen.AttributeTransformation)
 
     ### iterate through sections, instantiating a generator for each one
     generators = []
