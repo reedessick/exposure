@@ -233,6 +233,38 @@ def retrieve_segs(path):
     """
     return list(np.loadtxt(path))
 
+def report_horizon(path, horizon, flow, fhigh, psd_path):
+    """report the horizon to disk
+    """
+    with open(path, 'w') as f:
+        f.write('%.9e\n%d\n%d\n%s'%(horizon, flow, fhigh, psd_path))
+
+def retrieve_horizon(path):
+    """retrieve the horizon from disk
+    """
+    with open(path, 'r') as f:
+        horizon = float(f.readline().strip())
+        flow = float(f.readline().strip())
+        fhigh = float(f.readlin().strip())
+        psd_path = f.readline().strip()
+    return horizon, flow, fhigh, psd_path
+
+def report_sensitivity(path, sensitivity, *extra_header):
+    basepath = path.strip('.gz')
+    hp.write_map(
+        basepath,
+        network,
+        coord='C',
+        extra_header=extra_header,
+    )
+
+    if path.endswith('.gz'):
+        if opts.verbose:
+            print( "gzipping : %s -> %s"%(basepath, path) )
+        with open(basepath, 'r') as f:
+            with gzip.open(path, 'w') as gzf:
+                gzf.write(f.read())
+
 #-------------------------------------------------
 
 def andsegments(list1, list2):

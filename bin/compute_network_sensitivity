@@ -7,7 +7,6 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 #-------------------------------------------------
 
 import os
-import gzip
 
 import numpy as np
 import healpy as hp
@@ -15,7 +14,7 @@ import healpy as hp
 from optparse import OptionParser
 
 ### non-standard libraries
-from exposure import
+from exposure import utils
 from exposure import simulation
 
 from skymap_statitics import import detector_cache
@@ -60,9 +59,7 @@ horizons = []
 for ifo, path in opts.ifo_horizon:
     if opts.verbose:
         print( '%s -> %s'%(ifo, path) )
-    f = gzip.open(path, 'r')
-    horizons.append( (detector_cache.detectors[ifo], float(f.readline().strip())) )
-    f.close()
+    horizons.append( (detector_cache.detectors[ifo], utils.retrieve_horizon(path)[0]) )
 
 #------------------------
 
@@ -78,22 +75,8 @@ for gps in args:
 
     network = simulation.detectors2antenna(horizons, theta, phi, psi)
 
-    path = utils.sensitivity_path(opts.output_dir, opts.tag, gps, gzip=False)
+    path = utils.sensitivity_path(opts.output_dir, opts.tag, gps, gzip=True)
     if opts.verbose:
         print( "writing : "+path )
-    hp.write_map(
-        path, 
-        network, 
-        coord='C', 
-        extra_header=[(ifo, int(round(horizon, 0))) for ifo, horizon in horizons] + [('gps', int(round(gps, 0)))],
-    ) 
-
-    gzpath = utils.sensitivity_path(opts.output_dir, opts.tag, gps, gzip=True)
-    if opts.verbose:
-        print( "gzipping : %s -> %s"%(path, gzpath) )
-    f = open(path, 'r')
-    gzf = gzip.open(gzpath, 'w')
-    gzf.write(f.read())
-    gzf.close()
-    f.close()
-    os.remove(path) ### get rid of the extra copy
+    extra_header=[(ifo, int(round(horizon, 0))) for ifo, horizon in horizons] + [('gps', int(round(gps, 0)))]
+    utils.report_sensitivity(path, network, *extra_header)

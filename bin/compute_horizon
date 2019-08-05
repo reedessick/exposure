@@ -14,6 +14,7 @@ import numpy as np
 from optparse import OptionParser
 
 ### non-standard libraries
+from exposure import utils
 from exposure import simulation
 from skymap_statistics import detector_cache
 
@@ -60,6 +61,4 @@ horizon = simulation.detector2horizon(detector, opts.snr_thr, flow=opts.flow, fh
 path = utils.horizon_path(opts.output_dir, opts.tag, gpstart, gpsdur)
 if opts.verbose:
     print( 'writing : '+path )
-f = gzip.open(path, 'w')
-f.write('%.9e\n%d\n%d\n%s'%(horizon, opts.flow, opts.fhigh, args[0]))
-f.close()
+utils.report_horizon(path, horizon, opts.flow, opts.fhigh, args[0])

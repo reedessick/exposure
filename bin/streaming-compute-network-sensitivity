@@ -5,14 +5,178 @@ __author__ = "Reed Essick <reed.essick@gmail.com>"
 
 #-------------------------------------------------
 
+import os
+
+import logging
+from logging.handlers import TimedRotatingFileHandler
+
+import numpy as np
+import healpy as hp
+
 from argparse import ArgumentParser
+
+### non-standard libraries
+from exposure import utils
+from exposure import simulation
+
+from skymap_statitics import import detector_cache
+from skymap_statitics import triangulate
 
 #-------------------------------------------------
 
 parser = ArgumentParser(description=__doc__)
 
+parser.add_argument('-v', '--verbose', default=False, action='store_true')
+
+parser.add_argument('-s', '--source', default=[], required=True, nargs=3, type=str, action='append',
+    help='a source of PSDs. This can be repeated to specify multiple IFOs. eg, "--source IFO rootdir tag')
+parser.add_argument('-r', '--require', default=[], type=str, action='append',
+    help='require the PSD from this IFO to be present. Can be repeated to require multiple IFOs')
+
+parser.add_argument('--nside', default=simulation.DEFAULT_NSIDE, type=int,
+    help='the NSIDE resolution for the resulting FITS files')
+
+parser.add_argument('--gpsstart', type=float, default=None)
+parser.add_argument('--gpsstop', type=float, default=None)
+
+parser.add_argument('-o', '--output-dir', default='.', type=str)
+parser.add_argument('-t', '--tag', default='', type=str)
+
 args = parser.parse_args()
 
 #-------------------------------------------------
 
-raise NotImplementedError
+if args.gpsstart is None:
+    args.gpsstart = int(datafind.tconvert())
+
+if args.gpsstop is None:
+    args.gpsstop = np.infty
+
+if args.tag:
+    args.tag = "_"+args.tag
+
+args.source = [(ifo, rootdir, '_'+tag, ifo in args.require) for ifo, rootdir, tag in args.source]
+
+if not os.path.exists(args.output_dir):
+    os.makedirs(args.output_dir)
+
+#-------------------------------------------------
+
+### set up logger
+logdir = os.path.join(args.output_dir, 'log')
+if not os.path.exists(logdir):
+    os.makedirs(logdir)
+
+logname = os.path.basename(__file__)+args.tag
+logpath = os.path.join(logdir, logname+'.log')
+
+logger = logging.getLogger(logname)
+logger.setLevel(10)
+
+handlers = [
+    TimedRotatingFileHandler(logpath, when='D', utc=True)
+]
+if args.verbose:
+    handlers.append( logging.StreamHandler() )
+
+formatter = logging.Formatter('%(asctime)s | %(name)s : %(levelname)s : %(message)s')
+for handler in handlers:
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+#-------------------------------------------------
+
+network = detector_cache.Network() # declare this shared reference here
+
+npix = hp.nside2npix(args.nside)
+theta, ra = hp.pix2ang(args.nside, np.arange(npix)) ### positions in Equatorial coordinates
+psi = np.zeros_like(theta, dtype=float)
+
+#-------------------------------------------------
+
+### set up logger templates
+infotmp = 'processing data within [%d, %d).'
+
+tmp = 'searching for horizon for %s with rootdir=%s, tag=%s'
+horizonmps = dict((ifo, tmp%(ifo, rootdir, tag) + ' within [%d, %d).') for ifo, rootdir, tag, _ in args.source)
+
+updatetmp = 'updating horizon for %s from %s for data within [%d, %d).'
+
+timeouttmp = 'latency exceeded maximum value (%.3f sec) while searching for horizon from %s!'
+timeouttmps = dict((ifo, timeouttmp%(args.max_latency, ifo)+' Skipping data within [%d, %d).') for ifo, _, _, _ in args.source)
+
+missingtmp = 'found fewer than %d horizons.'%args.min_num_present + ' Skipping data within [%d, %d).'
+foundtmp = 'found horizons for %d IFOs (%s) within [%d, %d).'
+requiredtmp = 'horizon for %s required but not found. Skipping data within'
+requriedtmp = dict((ifo, requiredtmp%ifo +' [%d, %d).') for ifo, _, _, _ in args.source)
+
+writetmp = 'writing sensitivity to %s for data within [%d, %d).'
+latencytmp = 'latency=%.3f sec for data within [%d, %d).'
+
+### enter persistent loop
+logger.info('entering persistent loop')
+current = (args.gpsstart // args.stride)*args.stride
+half_stride = 0.5*args.stride
+
+while current < args.gpsstop:
+    future = current + args.stride
+    tup = (current, future)
+    logger.info(infotmp%tup)
+
+    ### search for PSDs for this stride
+    # remove all detectors from the network, adding back in only those that are present
+    horizons = []
+
+    datafind.wait(future, delay=args.delay, logger=logger)
+    for ifo, rootdir, tag, required in args.source:
+        path = utils.horizon_path(rootdir, tag, current, args.stride)
+        logger.info(horizontmps[ifo]%tup)
+        if os.path.exists(path):
+            logger.info(updatetmp%((ifo, path,)+tup))
+            horizon = utils.retrieve_horizon(path)[0]
+            det = detector_cache.detectors[ifo]
+            horizons.append((det, horizon)) ### append object to list of dectors for which we found data
+
+        else:
+            while datafind.latency(current, delay=args.delay) < args.max_latency:
+                if os.path.exists(psdpath):
+                    logger.info(updatetmp%((ifo, psdpath,)+tup))
+                    horizon = utils.retrieve_horizon(path)[0]
+                    det = detector_cache.detectors[ifo]
+                    horizons.append((det, horizon)) ### append object to list of dectors for which we found data
+                    break
+                else:
+                    datafind.sleep(args.cadence)
+
+            else:
+                logger.warn(timeouttmps[ifo]%tup)
+                if required:
+                    logger.warn(requiredtmp[ifo]%tup)
+                    current = future
+                    break
+
+    else: ### did not break because of a missing required PSD
+        if len(horizons) < args.min_num_present:
+            logger.warn(missingtmp%tup)
+            current = future ### bump to next stride
+            continue
+
+        # Note: we can only get here if we have at least one active detector
+        logger.info(foundtmp%((len(horizons), ', '.join(det.name for det, _ in horizons))+tup))
+
+        ### compute sensitivity map
+        gps = current + half_stride
+        phi = triangulate.rotateRAC2E(ra, gps) ### find the corresponding positions in Geographic coordinates
+
+        network = simulation.detectors2antenna(horizons, theta, phi, psi)
+
+        ### write FITS
+        path = utils.sensitivity_path(opts.output_dir, opts.tag, gps, gzip=False)
+        logger.info(writetmp%((path,)+tup))
+
+        extra_header=[(det.name, int(round(horizon, 0))) for det, horizon in horizons] + [('gps', int(round(gps, 0)))]
+        utils.report_sensitivity(path, network, *extra_header)
+
+        ### increment to the next stride
+        logger.info(latencytmp%((datafind.latency(current, delay=args.delay),)+tup))
+        current = future
