@@ -89,9 +89,9 @@ parser.add_option('', '--do-not-normalize', default=False, action='store_true',
 parser.add_option('', '--universe', default='vanilla', type='string',
     help='DEFAULT=vanilla')
 
-parser.add_option('', '--psd-exe', default='compute_psd', type='string',
+parser.add_option('', '--psd-exe', default='compute-psd', type='string',
     help='specify the explicit path to the executable. \
-DEFAULT=compute_psd')
+DEFAULT=compute-psd')
 parser.add_option('', '--horizon-exe', default='compute_horizon', type='string',
     help='specify the explicit path to the executable. \
 DEFAULT=compute_horizon')

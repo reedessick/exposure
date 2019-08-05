@@ -26,7 +26,7 @@ parser.add_option('', '--nside', default=512, type='int',
 
 parser.add_option('', '--universe', default='vanilla', type='string',
     help='DEFAULT=vanilla')
-parser.add_option('', '--exe', default='compute_psd', type='string',
+parser.add_option('', '--exe', default='compute-psd', type='string',
     help='specify the explicit path to the executable. \
 DEFAULT=compute_psd')
 
@@ -86,7 +86,7 @@ f.write(utils.compute_network_sensitivity_sub%{\
 })
 f.close()
 
-### iterate over segments and define compute_psd jobs for each
+### iterate over segments and define compute-psd jobs for each
 dagname = subname.replace('.sub', '.dag')
 if opts.verbose:
     print( "writing : "+dagname )

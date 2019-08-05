@@ -80,7 +80,7 @@ f.write(utils.compute_horizon_sub%{\
 })
 f.close()
 
-### iterate over segments and define compute_psd jobs for each
+### iterate over segments and define compute-psd jobs for each
 dagname = subname.replace('.sub', '.dag')
 if opts.verbose:
     print( "writing : "+dagname )

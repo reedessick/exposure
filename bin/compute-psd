@@ -10,7 +10,7 @@ import os
 import gzip
 import subprocess as sp
 
-from optparse import OptionParser
+from argparse import ArgumentParser
 
 ### non-standard libraries
 from exposure import utils
@@ -19,99 +19,100 @@ from exposure import dft
 
 #-------------------------------------------------
 
-parser = OptionParser(usage=__usage__, description=__description__)
+parser = ArgumentParser(description=__description__)
 
-parser.add_option("-v", "--verbose", default=False, action="store_true")
-parser.add_option("-V", "--Verbose", default=False, action="store_true")
+parser.add_argument('channel', type=str)
+parser.add_argument('frametype', type=str)
+parser.add_argument('gpsstart', type=int)
+parser.add_argument('gpsstop', type=int)
 
-parser.add_option("", "--include-flag", default=[], type='string', action='append',
+parser.add_argument("-v", "--verbose", default=False, action="store_true")
+parser.add_argument("-V", "--Verbose", default=False, action="store_true")
+
+parser.add_argument("--include-flag", default=[], type=str, action='append',
     help='the flags used to select subsets of [gpsstart, gpsstop] for analysis. \
 Can be repeated to take the intersection of multiple flags. \
 DEFAULT=[] (analyze all time in [gpsstart, gpsstop]).')
-parser.add_option("", "--exclude-flag", default=[], type='string', action='append',
+parser.add_argument("--exclude-flag", default=[], type=str, action='append',
     help='the same as --include-flag, except we only retain times that are \
 outside of these flags instead of inside them')
 
-parser.add_option("", "--seglen", default=dft.DEFAULT_SEGLEN, type='int',
+parser.add_argument("--seglen", default=dft.DEFAULT_SEGLEN, type=int,
     help='the length of segments used to estimate the PSD via an averaging procedure (specify in seconds). \
 NOTE: if we do not obtain an integer number of segments based on --seglen, --overlap, gpsstart, and gpsstop, \
 we will raise a ValueError. DEFAULT=%d'%dft.DEFAULT_SEGLEN)
-parser.add_option("", "--overlap", default=dft.DEFAULT_OVERLAP, type='float',
+parser.add_argument("--overlap", default=dft.DEFAULT_OVERLAP, type=float,
     help='the amount of time overlapped for segments used to estimate the PSD (specify in seconds). \
 NOTE: if we do not obtain an integer number of segments based on --seglen, --overlap, gpsstart, and gpsstop, \
 we will raise a ValueError. DEFAULT=%.3f'%dft.DEFAULT_OVERLAP)
-parser.add_option("", "--tukey-alpha", default=dft.DEFAULT_TUKEY_ALPHA, type='float',
+parser.add_argument("--tukey-alpha", default=dft.DEFAULT_TUKEY_ALPHA, type=float,
     help='the Tukey "alpha" value used for windowing the DFT. \
 DEFAULT=%.3f'%dft.DEFAULT_TUKEY_ALPHA)
 
-parser.add_option("-o", "--output-dir", default='.', type='string')
-parser.add_option("-t", "--tag", default="", type='string')
+parser.add_argument("-o", "--output-dir", default='.', type=str)
+parser.add_argument("-t", "--tag", default="", type=str)
 
-opts, args = parser.parse_args()
-assert len(args)==4, 'please supply exactly 4 arguments\n%s'%__usage__
-channel, frametype = args[:2]
-gpsstart, gpsstop = [int(_) for _ in args[2:]]
-stride = gpsstop - gpsstart
+stride = args.gpsstop - args.gpsstart
 
-assert channel[0]==frametype[0], 'I do not believe you want a channel and frametype \
-from different IFOs\n\tchannel : %s\n\tframetype : %s\n%s'%(channel, frametype, __usage__)
+assert args.channel[0]==args.frametype[0], 'I do not believe you want a channel and frametype \
+from different IFOs\n\tchannel : %s\n\tframetype : %s'%(args.channel, args.frametype)
 
-assert opts.seglen > opts.overlap, '--seglen must be larger than --overlap\n\%s'%__usage__
+assert args.seglen > args.overlap, '--seglen must be larger than --overlap'
 
-if opts.tag:
-    opts.tag = "_"+opts.tag
+if args.tag:
+    args.tag = "_"+args.tag
 
-if not os.path.exists(opts.output_dir):
-    os.makedirs(opts.output_dir)
+if not os.path.exists(args.output_dir):
+    os.makedirs(args.output_dir)
 
-opts.verbose |= opts.Verbose
+args.verbose |= args.Verbose
 
 #-------------------------------------------------
 
 ### ensure we have proper coverage
 segments = [[gpsstart, gpsstop]]
 
-segments = datafind.include_flags(segments, opts.include_flag, gpsstart, stride, verbose=opts.verbose)
-segments = datafind.exclude_flags(segments, opts.exclude_flag, gpsstart, stride, verbose=opts.verbose)
+segments = datafind.include_flags(segments, args.include_flag, gpsstart, stride, verbose=args.verbose)
+segments = datafind.exclude_flags(segments, args.exclude_flag, gpsstart, stride, verbose=args.verbose)
 
 assert segments, 'no remaining livetime after filtering by flags!'
 assert len(segments)==1, 'more than one segment after filtering by flags!'
-assert segments[0][0]==gpsstart and segments[0][1]==gpsstop, 'segments to not cover entire requested time period!'
+assert segments[0][0]==args.gpsstart and segments[0][1]==args.gpsstop, 'segments to not cover entire requested time period!'
 
 #------------------------
 
 ### grab frames
-frames = datafind.gw_data_find(channel[0], frametype, gpsstart, gpsstop-gpsstart, verbose=opts.verbose)
+frames = datafind.gw_data_find(args.channel[0], args.frametype, args.gpsstart, stride, verbose=args.verbose)
 
 ### insure we have full coverage
 segs = utils.andsegments(segments, utils.mergesegments([(s,s+d) for _, s, d in frames]))
 
 assert segs, 'no frame data found!'
 assert len(segs)==1, 'gap in frame data found!'
-assert segs[0][0]==gpsstart and segs[0][1]==gpsstop, 'frame data does not cover entire requested time period!'
+assert segs[0][0]==args.gpsstart and segs[0][1]==args.gpsstop, 'frame data does not cover entire requested time period!'
 
 #-------------------------------------------------
 
 ### read in data
-if opts.verbose:
+if args.verbose:
     print( 'reading data' )
-vect, dt = datafind.vec_from_frames(frames, channel, gpsstart, gpsstop, verbose=opts.Verbose)
+vect, dt = datafind.vec_from_frames(frames, args.channel, args.gpsstart, args.gpsstop, verbose=args.Verbose)
 
 ### compute PSD
-n = 1 + 1.*(gpsstop - gpsstart - opts.seglen)/(opts.seglen - opts.overlap)
+n = 1 + 1.*(stride - args.seglen)/(args.seglen - args.overlap)
 assert n%1==0, 'must be an integer number of segments used to compute PSD! Check your combination of gpsstart, gpsstop, --seglen, and --overlap'
 n = int(n)
 
-overlap = 1.*opts.overlap/opts.seglen ### the fractional overlap we want
-if opts.verbose:
+overlap = 1.*args.overlap/args.seglen ### the fractional overlap we want
+if args.verbose:
     print( 'estimating PSD using %d segments with %.3f fractional overlap'%(n, overlap) )
-psd, freqs = dft.estimate_psd(vect, num_segs=n, overlap=overlap, dt=dt, tukey_alpha=opts.tukey_alpha)
+psd, freqs = dft.estimate_psd(vect, num_segs=n, overlap=overlap, dt=dt, tukey_alpha=args.tukey_alpha)
 
 ### write PSD
-path = utils.psd_path(opts.output_dir, opts.tag, gpsstart, gpsstop-gpsstart)
+path = utils.psd_path(args.output_dir, args.tag, args.gpsstart, stride)
 directory = os.path.dirname(path)
 if not os.path.exists(directory):
     os.makedirs(directory)
-if opts.verbose:
+if args.verbose:
     print( "writing : "+path )
 utils.report_psd(path, freqs, psd)
