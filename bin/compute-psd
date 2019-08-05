@@ -1,14 +1,11 @@
 #!/usr/bin/env python
 
-__usage__ = "compute_psd [--options] channel frametype gpsstart gpsstop"
-__description__ = "a very basic executable that computes a PSD estimate based on the time between [gpsstart, gpsstop]. NOTE: if the derived set of segments is not contiguous throughout [gpsstart, gpsstop], we raise an exception."
+__doc__ = "a very basic executable that computes a PSD estimate based on the time between [gpsstart, gpsstop]. NOTE: if the derived set of segments is not contiguous throughout [gpsstart, gpsstop], we raise an exception."
 __author__ = "Reed Essick (reed.essick@ligo.org)"
 
 #-------------------------------------------------
 
 import os
-import gzip
-import subprocess as sp
 
 from argparse import ArgumentParser
 
@@ -19,7 +16,7 @@ from exposure import dft
 
 #-------------------------------------------------
 
-parser = ArgumentParser(description=__description__)
+parser = ArgumentParser(description=__doc__)
 
 parser.add_argument('channel', type=str)
 parser.add_argument('frametype', type=str)
