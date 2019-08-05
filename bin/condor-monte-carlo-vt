@@ -45,8 +45,8 @@ parser.add_argument("--win", default=60, type=int,
     help="estimate PSDs separately in sequential windows of this duration. \
 DEFAULT=60")
 
-parser.add_argument('-s', '--source', default=[], required=True, type=str, action='append',
-    help='a source of PSDs. This can be repeated to specify multiple IFOs. eg, "--source IFO')
+parser.add_argument('-s', '--source', default=[], required=True, nargs=3, type=str, action='append',
+    help='a source of PSDs. This can be repeated to specify multiple IFOs. eg, "--source IFO rootdir tag')
 parser.add_argument('--snr-threshold', default=montecarlo.DEFAULT_SNR_THRESHOLD, type=float,
     help='the network SNR threshold for detection. Used within gw_event_gen.eventgen.Pdet to determine the probability of detecting a signal')
 
@@ -113,12 +113,12 @@ if args.verbose:
 with open(mc_subname, 'w') as f:
     f.write(utils.monte_carlo_vt_sub%{\
         'universe' : args.universe,
-        'exe' : os.path.abspath(find_executable(args.monte_carlo_exe)),
+        'exe' : os.path.abspath(find_executable(args.exe)),
         'population' : args.population,
         'snr_threshold' : args.snr_threshold,
         'min_num_samples' : args.min_num_samples,
         'error' : args.fractional_systematic_error,
-        'sources' : ' '.join('--source %s %s "%s"'%(ifo, args.output_dir, args.tag) for ifo, _, _ in args.source),
+        'sources' : ' '.join('--source %s %s "%s"'%(ifo, rootdir, tag) for ifo, rootdir, tag in args.source),
         'accounting_group' : args.accounting_group,
         'accounting_group_user' : args.accounting_group_user,
         'tag' :  "--tag "+args.tag if args.tag else '',
