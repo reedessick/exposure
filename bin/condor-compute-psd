@@ -1,0 +1,172 @@
+#!/usr/bin/env python
+
+__doc__ = "a very basic wrapper that schedules `compute-psd` jobs. The resulting DAG should run to completion if everything worked correctly (i.e. nodes should not raise exceptions"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import os
+import getpass ### for default accounting_group_user
+import subprocess as sp
+
+from argparse import ArgumentParser
+
+### non-standard libraries
+from exposure import utils
+from exposure import datafind
+
+#-------------------------------------------------
+
+parser = OptionParser(description=__doc__)
+
+parser.add_argument('channel', type=str)
+parser.add_argument('frametype', type=str)
+parser.add_argument('gpsstart', type=int)
+parser.add_argument('gpsstop', type=int)
+
+parser.add_argument("-v", "--verbose", default=False, action="store_true")
+parser.add_argument("-V", "--Verbose", default=False, action="store_true")
+
+parser.add_argument("--include-flag", default=[], type=str, action='append',
+    help='the flags used to select subsets of [gpsstart, gpsstop] for analysis. \
+Can be repeated to take the intersection of multiple flags. \
+DEFAULT=[] (analyze all time in [gpsstart, gpsstop]).')
+parser.add_argument("--exclude-flag", default=[], type=str, action='append',
+    help='the same as --include-flag, except we only retain times that are \
+outside of these flags instead of inside them')
+
+parser.add_argument("--win", default=60, type=int,
+    help="estimate PSDs separately in sequential windows of this duration. \
+DEFAULT=60")
+
+parser.add_argument("--seglen", default=4, type=int,
+    help='the length of segments used to estimate the PSD via an averaging procedure (specify in seconds). \
+NOTE: if we do not obtain an integer number of segments based on --seglen, --overlap, gpsstart, and gpsstop, \
+we will raise a ValueError. DEFAULT=4')
+parser.add_argument("--overlap", default=2, type=float,
+    help='the amount of time overlapped for segments used to estimate the PSD (specify in seconds). \
+NOTE: if we do not obtain an integer number of segments based on --seglen, --overlap, gpsstart, and gpsstop, \
+we will raise a ValueError. DEFAULT=2')
+parser.add_argument("--tukey-alpha", default=0.50, type=float,
+    help='the Tukey "alpha" value used for windowing the DFT. \
+DEFAULT=0.50')
+
+parser.add_argument('--universe', default='vanilla', type=str,
+    help='DEFAULT=vanilla')
+parser.add_argument('--exe', default='compute-psd', type=str,
+    help='specify the explicit path to the executable. \
+DEFAULT=compute-psd')
+
+parser.add_argument('--accounting-group', default='ligo.dev.o1.burst.explore.test', type=str,
+    help='DEFAULT=ligo.dev.o1.burst.explore.test')
+parser.add_argument('--accounting-group-user', default=getpass.getuser(), type=str,
+    help='DEFAULT='+getpass.getuser())
+
+parser.add_argument('--retry', default=0, type=int,
+    help='DEFAULT=0')
+
+parser.add_argument("-o", "--output-dir", default='.', type=str)
+parser.add_argument("-t", "--tag", default="", type=str)
+
+parser.add_argument('-s', '--condor-submit', default=False, action='store_true',
+    help='submit the DAG to condor')
+
+args = parser.parse_args()
+
+stride = args.gpsstop - args.gpsstop
+
+assert args.channel[0]==args.frametype[0], 'I do not believe you want a channel and frametype \
+from different IFOs\n\tchannel : %s\n\tframetype : %s'%(args.channel, args.frametype)
+
+assert args.seglen > args.overlap, '--seglen must be larger than --overlap'
+
+if args.tag:
+    filetag = "_"+args.tag
+else:
+    filetag = ""
+
+if not os.path.exists(args.output_dir):
+    os.makedirs(args.output_dir)
+
+args.verbose |= args.Verbose
+
+#-------------------------------------------------
+
+### query segments to define individual runs
+### ensure we have proper coverage
+segments = [[args.gpsstart, args.gpsstop]]
+
+segments = datafind.include_flags(segments, args.include_flag, args.gpsstart, stride, verbose=args.verbose)
+segments = datafind.exclude_flags(segments, args.exclude_flag, args.gpsstart, stride, verbose=args.verbose)
+
+### check to make sure we have livetime left, etc
+assert len(segments), 'no remaining livetime after filtering by flags!'
+lvtm = sum([e-s for e, e in segments]) ### amount of time requested within segments
+
+#------------------------
+
+### write sub file
+subname = "%s/compute-psd%s.sub"%(args.output_dir, filetag)
+if args.verbose:
+    print( "writing : "+subname )
+with open(subname, 'w') as f:
+    f.write(utils.compute_psd_sub%{\
+        'universe' : args.universe,
+        'exe' : args.exe,
+        'channel' : args.channel,
+        'frametype' : args.frametype,
+        'accounting_group' : args.accounting_group,
+        'accounting_group_user' : args..accounting_group_user,
+        'tag' :  "--tag "+args.tag if args.tag else '',
+        'filetag' : filetag,
+        'start' : args.gpsstart,
+        'dur' : stride,
+        'seglen' : args.seglen,
+        'overlap' : args.overlap,
+        'tukey_alpha' : args.tukey_alpha,
+    })
+
+### iterate over segments and define compute-psd jobs for each
+dagname = subname.replace('.sub', '.dag')
+if args.verbose:
+    print( "writing : "+dagname )
+with open(dagname, 'w') as f:
+
+    covered = 0 ### amount of time that's covered by a PSD estimate
+    for segstart, segstop in segments:
+        segdur = segstop - segstart
+        if args.verbose:
+            print( "scheduling jobs for %d -- %d"%(segstart, segstop) )
+    
+        s = (segstart/opts.win)*opts.win ### line-up start with integer number of windows. Needed to guarantee files will line up later -> integer division!
+        if s < segstart: ### mostly likely case, but we need to check just in case
+            s += opts.win 
+
+        while s+opts.win < segstop:
+            f.write(utils.compute_psd_dag%{\
+                'jobid' : '%d'%s,
+                'sub' : subname,
+                'gpsstart' : s, 
+                'gpsstop' : s+args.win,
+                'retry' : args.retry,
+                'outdir' : args.output_dir,
+            })
+            s += args.win
+            covered += args.win
+
+#-------------------------------------------------
+
+if args.Verbose: ### report amount of time covered
+    print( 'requested       : %d sec'%stride )
+    print( 'within segments : %d sec'%lvtm )
+    print( 'covered by PSD  : %d sec'%covered )
+
+### submit
+if args.condor_submit:
+    if args.verbose:
+        print( 'submitting : '+dagname )
+    import subprocess as sp
+    sp.Popen(['condor_submit_dag', dagname]).wait()
+
+elif args.verbose:
+    print( 'you can now submit : '+dagname )

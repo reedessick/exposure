@@ -1,0 +1,221 @@
+#!/usr/bin/env python
+
+__doc__ = "a very basic wrapper that schedules PSD and `monte-carlo-vt` jobs. The resulting DAG should run to completion if everything worked correctly (i.e. nodes should not raise exceptions"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import os
+import getpass
+import subprocess as sp
+
+from argparse import ArgumentParser
+
+### non-standard libraries
+from exposure import utils
+from exposure import datafind
+
+#-------------------------------------------------
+
+parser = ArgumentParser(description=__doc__)
+
+parser.add_argument('population', type=str,
+    help='the population specification config used to genreate Monte-Carlo samples. \
+This includes things like mass, spin, and redshift distributions, although we will \
+dynamically determine the maximum redshift for detectable sources given each set of PSDs.')
+
+parser.add_argument('gpsstart', type=float)
+parser.add_argument('gpsstop', type=float)
+
+parser.add_argument("-v", "--verbose", default=False, action="store_true")
+parser.add_argument("-V", "--Verbose", default=False, action="store_true")
+
+parser.add_argument("--include-flag", default=[], type=str, action='append',
+    help='the flags used to select subsets of [gpsstart, gpsstop] for analysis. \
+Can be repeated to take the intersection of multiple flags. \
+DEFAULT=[] (analyze all time in [gpsstart, gpsstop]).')
+parser.add_argument("--exclude-flag", default=[], type=str, action='append',
+    help='the same as --include-flag, except we only retain times that are \
+outside of these flags instead of inside them')
+
+parser.add_argument("--win", default=60, type=int,
+    help="estimate PSDs separately in sequential windows of this duration. \
+DEFAULT=60")
+
+parser.add_argument("--seglen", default=4, type=int,
+    help='the length of segments used to estimate the PSD via an averaging procedure (specify in seconds). \
+NOTE: if we do not obtain an integer number of segments based on --seglen, --overlap, gpsstart, and gpsstop, \
+we will raise a ValueError. DEFAULT=4')
+parser.add_argument("--overlap", default=2, type=float,
+    help='the amount of time overlapped for segments used to estimate the PSD (specify in seconds). \
+NOTE: if we do not obtain an integer number of segments based on --seglen, --overlap, gpsstart, and gpsstop, \
+we will raise a ValueError. DEFAULT=2')
+parser.add_argument("--tukey-alpha", default=0.50, type=float,
+    help='the Tukey "alpha" value used for windowing the DFT. \
+DEFAULT=0.50')
+
+parser.add_argument('-s', '--source', default=[], required=True, nargs=3, type=str, action='append',
+    help='a source of PSDs. This can be repeated to specify multiple IFOs. eg, "--source IFO channel ldr_type')
+parser.add_argument('--snr-threshold', default=DEFAULT_SNR_THRESHOLD, type=float,
+    help='the network SNR threshold for detection. Used within gw_event_gen.eventgen.Pdet to determine the probability of detecting a signal')
+
+parser.add_argument('-N', '--min-num-samples', default=montecarlo.DEFAULT_MIN_NUM_SAMPLES, type=int,
+    help='the minimum number of Monte-Carlo samples to be generated for each stride, independent of the "smart" termination condition')
+parser.add_argument('-f', '--fractional-systematic-error', default=montecarlo.DEFAULT_ERROR, type=float,
+    help='the desired fractional systematic error expected from the Monte-Carlo integral for VT based on Farr (2019): arXiv:1904.10879. \
+If not specified, we will only be limitted by --min-num-samples. \
+**NOTE**, we assume zero observations (Nobs=0) in the derrived expressions, which will only scale the actual fractional systematic error \
+approximately linearly with the actually number of observaitons.')
+
+parser.add_argument('--universe', default='vanilla', type=str,
+    help='DEFAULT=vanilla')
+parser.add_argument('--psd-exe', default='compute-psd', type=str,
+    help='specify the explicit path to the executable. \
+DEFAULT=compute-psd')
+parser.add_argument('--monte-carlo-exe', default='monte-carlo-vt', type=str,
+    help='specify the explicit path to the executable.')
+
+parser.add_argument('--accounting-group', default='ligo.dev.o1.burst.explore.test', type=str,
+    help='DEFAULT=ligo.dev.o1.burst.explore.test')
+parser.add_argument('--accounting-group-user', default=getpass.getuser(), type=str,
+    help='DEFAULT='+getpass.getuser())
+
+parser.add_argument('--retry', default=0, type=int,
+    help='DEFAULT=0')
+
+parser.add_argument("-o", "--output-dir", default='.', type=str)
+parser.add_argument("-t", "--tag", default="", type=str)
+
+parser.add_argument('-s', '--condor-submit', default=False, action='store_true',
+    help='submit the DAG to condor')
+
+args = parser.parse_args()
+
+stride = args.gpsstop - args.gpsstop
+
+for ifo, channel, frametype in args.source:
+    assert channel[0]==frametype[0], 'I do not believe you want a channel and frametype \
+        from different IFOs\n\tchannel : %s\n\tframetype : %s'%(channel, frametype)
+
+assert args.seglen > args.overlap, '--seglen must be larger than --overlap'
+
+if args.tag:
+    filetag = "_"+args.tag
+else:
+    filetag = ""
+
+if not os.path.exists(args.output_dir):
+    os.makedirs(args.output_dir)
+
+args.verbose |= args.Verbose
+
+#-------------------------------------------------
+
+### query segments to define individual runs
+### ensure we have proper coverage
+segments = [[args.gpsstart, args.gpsstop]]
+
+segments = datafind.include_flags(segments, args.include_flag, args.gpsstart, stride, verbose=args.verbose)
+segments = datafind.exclude_flags(segments, args.exclude_flag, args.gpsstart, stride, verbose=args.verbose)
+
+### check to make sure we have livetime left, etc
+assert len(segments), 'no remaining livetime after filtering by flags!'
+lvtm = sum([e-s for e, e in segments]) ### amount of time requested within segments
+
+#------------------------
+
+### write sub files
+psd_subnames = dict()
+for ifo, channel, frametype in args.source:
+    psd_subname = "%s/compute-psd%s.sub"%(args.output_dir, filetag)
+    if args.verbose:
+        print( "writing : "+psd_subname )
+    psd_subnames[ifo] = psd_subname
+    with open(psd_subname, 'w') as f:
+        f.write(utils.compute_psd_sub%{\
+            'universe' : args.universe,
+            'exe' : args.psd_exe,
+            'channel' : channel,
+            'frametype' : frametype,
+            'accounting_group' : args.accounting_group,
+            'accounting_group_user' : args..accounting_group_user,
+            'tag' :  "--tag "+args.tag if args.tag else '',
+            'filetag' : filetag,
+            'seglen' : args.seglen,
+            'overlap' : args.overlap,
+            'tukey_alpha' : args.tukey_alpha,
+        })
+
+mc_subname = "%s/monte-carlo-vt%s.sub"%(args.output_dir, filetag)
+if args.verbose:
+    print( "writing : "+mc_subname)
+with open(mc_subname, 'w') as f:
+    f.write(utils.monte_carlo_vt_sub%{\
+        'universe' : args.universe,
+        'exe' : args.monte_carlo_exe,
+        'population' : args.population,
+        'snr_threshold' : args.snr_threshold,
+        'min_num_samples' : args.min_num_samples,
+        'error' : args.fractional_systematic_error,
+        'sources' : ' '.join('--source %s %s "%s"'%(ifo, opts.output_dir, args.tag) for ifo, _, _ in args.source),
+        'accounting_group' : args.accounting_group,
+        'accounting_group_user' : args..accounting_group_user,
+        'tag' :  "--tag "+args.tag if args.tag else '',
+        'filetag' : filetag,
+    })
+
+### iterate over segments and define compute_psd jobs for each
+dagname = "%s/compute-psd-monte-carlo-vt%s.sub"%(args.output_dir, filetag)
+if args.verbose:
+    print( "writing : "+dagname )
+with open(dagname, 'w') as f:
+
+    covered = 0 ### amount of time that's covered by a PSD estimate
+    for segstart, segstop in segments:
+        segdur = segstop - segstart
+        if args.verbose:
+            print( "scheduling jobs for %d -- %d"%(segstart, segstop) )
+
+        s = (segstart/opts.win)*opts.win ### line-up start with integer number of windows. Needed to guarantee files will line up later -> integer division!
+        if s < segstart: ### mostly likely case, but we need to check just in case
+            s += opts.win
+
+        while s+opts.win < segstop:
+            for ifo, _, _ in args.source: ### do this once for each IFO
+                f.write(utils.compute_psd_dag%{\
+                    'jobid' : '%s-%d'%(ifo, s),
+                    'sub' : psd_subnames[ifo],
+                    'gpsstart' : s,
+                    'gpsstop' : s+args.win,
+                    'retry' : args.retry,
+                    'outdir' : args.output_dir,
+                })
+
+            f.write(utils.monte_carlo_vt_dag%{\
+                'jobid' : '%d'%s,
+                'sub' : mc_subname,
+                'gpsstart' : s,
+                'gpsstop' : s+args.win,
+                'retry' : args.retry,
+                'outdir' : args.output_dir,
+            })
+
+            s += args.win
+            covered += args.win
+
+#-------------------------------------------------
+
+if args.Verbose: ### report amount of time covered
+    print( 'requested       : %d sec'%stride )
+    print( 'within segments : %d sec'%lvtm )
+    print( 'covered by PSD  : %d sec'%covered )
+
+### submit
+if args.condor_submit:
+    if args.verbose:
+        print( 'submitting : '+dagname )
+    import subprocess as sp
+    sp.Popen(['condor_submit_dag', dagname]).wait()
+
+elif args.verbose:
+    print( 'you can now submit : '+dagname )

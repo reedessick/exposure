@@ -125,6 +125,25 @@ VARS   compute_horizon_%(jobid)s path="%(path)s" tag="%(tag)s"
 RETRY  compute_horizon_%(jobid)s %(retry)d
 '''
 
+monte_carlo_vt_sub = '''\
+universe = %(universe)s
+executable = %(exe)s
+arguments = "--verbose %(population)s $(gpsstart) $(gpsstop) --snr-threshold %(snr_threshold).6f --min-num-samples %(min_num_samples)d --fractional-systematic-error %(error).6f %(sources)s --output-dir $(outdir) %(tag)s"
+getenv = true
+accounting_group = %(accounting_group)s
+accounting_group_user = %(accounting_group_user)s
+log    = $(outdir)/condor-monte-carlo-vt%(filetag)s_$(Cluster)-$(Process).log
+error  = $(outdir)/condor-monte-carlo-vt%(filetag)s_$(Cluster)-$(Process).err 
+output = $(outdir)/condor-monte-carlo-vt%(filetag)s_$(Cluster)-$(Process).out
+notification = never
+queue 1'''
+
+monte_carlo_vt_dag = '''\
+JOB    monte_carlo_vt_%(jobid)s %(sub)s
+VARS   monte_carlo_vt_%(jobid)s gpsstart="%(gpsstart)d" gpsstop="%(gpsstop)d" outdir="%(outdir)s"
+RETRY  monte_carlo_vt_%(jobid)s %(retry)d
+'''
+
 #-------------------------------------------------
 
 MOD_STRIDE = 100000
