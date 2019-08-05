@@ -9,6 +9,8 @@ import os
 import getpass ### for default accounting_group_user
 import subprocess as sp
 
+from distutils.spawn import find_executable
+
 from argparse import ArgumentParser
 
 ### non-standard libraries
@@ -73,7 +75,7 @@ parser.add_argument('-s', '--condor-submit', default=False, action='store_true',
 
 args = parser.parse_args()
 
-stride = args.gpsstop - args.gpsstop
+stride = args.gpsstop - args.gpsstart
 
 assert args.channel[0]==args.frametype[0], 'I do not believe you want a channel and frametype \
 from different IFOs\n\tchannel : %s\n\tframetype : %s'%(args.channel, args.frametype)
@@ -101,7 +103,7 @@ segments = datafind.exclude_flags(segments, args.exclude_flag, args.gpsstart, st
 
 ### check to make sure we have livetime left, etc
 assert len(segments), 'no remaining livetime after filtering by flags!'
-lvtm = sum([e-s for e, e in segments]) ### amount of time requested within segments
+lvtm = utils.livetime(segments) ### amount of time requested within segments
 
 #------------------------
 
@@ -112,7 +114,7 @@ if args.verbose:
 with open(subname, 'w') as f:
     f.write(utils.compute_psd_sub%{\
         'universe' : args.universe,
-        'exe' : args.exe,
+        'exe' : os.path.abspath(find_executable(args.exe)),
         'channel' : args.channel,
         'frametype' : args.frametype,
         'accounting_group' : args.accounting_group,

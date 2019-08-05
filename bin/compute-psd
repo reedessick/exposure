@@ -49,6 +49,8 @@ DEFAULT=%.3f'%dft.DEFAULT_TUKEY_ALPHA)
 parser.add_argument("-o", "--output-dir", default='.', type=str)
 parser.add_argument("-t", "--tag", default="", type=str)
 
+args = parser.parse_args()
+
 stride = args.gpsstop - args.gpsstart
 
 assert args.channel[0]==args.frametype[0], 'I do not believe you want a channel and frametype \
@@ -69,8 +71,8 @@ args.verbose |= args.Verbose
 ### ensure we have proper coverage
 segments = [[args.gpsstart, args.gpsstop]]
 
-segments = datafind.include_flags(segments, args.include_flag, gpsstart, stride, verbose=args.verbose)
-segments = datafind.exclude_flags(segments, args.exclude_flag, gpsstart, stride, verbose=args.verbose)
+segments = datafind.include_flags(segments, args.include_flag, args.gpsstart, stride, verbose=args.verbose)
+segments = datafind.exclude_flags(segments, args.exclude_flag, args.gpsstart, stride, verbose=args.verbose)
 
 assert segments, 'no remaining livetime after filtering by flags!'
 assert len(segments)==1, 'more than one segment after filtering by flags!'

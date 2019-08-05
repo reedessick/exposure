@@ -11,6 +11,8 @@ import getpass
 import subprocess as sp
 from collections import defaultdict
 
+from distutils.spawn import find_executable
+
 from optparse import OptionParser
 
 ### non-standard libraries
@@ -199,7 +201,7 @@ for ifo, channel, frametype in opts.ifo_specs:
     sub = open(psd_subname, 'w')
     sub.write(utils.compute_psd_sub%{\
         'universe' : opts.universe,
-        'exe' : opts.psd_exe,
+        'exe' : os.path.abspath(find_executable(opts.psd_exe)),
         'channel' : channel,
         'frametype' : frametype,
         'accounting_group' : opts.accounting_group,
@@ -221,7 +223,7 @@ for ifo, channel, frametype in opts.ifo_specs:
     sub = open(hor_subname, 'w')
     sub.write(utils.compute_horizon_sub%{\
         'universe' : opts.universe,
-        'exe' : opts.horizon_exe,
+        'exe' : os.path.abspath(find_executable(opts.horizon_exe)),
         'accounting_group' : opts.accounting_group,
         'accounting_group_user' : opts.accounting_group_user,
         'filetag' : filetag,
@@ -271,8 +273,8 @@ for ifo, channel, frametype in opts.ifo_specs:
             horizon_path = utils.horizon_path(outdir, '%s%s'%(filetag, ifo), s, opts.win) ### should produce this path
 
             ### add parent child relationships
-            psd_jobid = 'compute_psd_%s-%d'%(ifo, s) ### FIXME: hard-coded jobid may be fragile...
-            horizon_jobid = 'compute_horizon_%s-%d'%(ifo, s)
+            psd_jobid = utils.compute_psd_jobid%('%s-%d'%(ifo, s))
+            horizon_jobid = utils.compute_horizon_jobid%('%s-%d'%(ifo, s))
             dag.write('PARENT %s CHILD %s\n'%(psd_jobid, horizon_jobid))
 
             ### update book keeping
@@ -299,7 +301,7 @@ if opts.verbose:
 sen_sub = open(sen_subname, 'w')
 sen_sub.write(utils.compute_network_sensitivity_sub%{\
     'universe' : opts.universe,
-    'exe' : opts.sensitivity_exe,
+    'exe' : os.path.abspath(find_executable(opts.sensitivity_exe)),
     'accounting_group' : opts.accounting_group,
     'accounting_group_user' : opts.accounting_group_user,
     'nside' : opts.nside,
@@ -323,7 +325,7 @@ for s, ifos in time_periods.items():
         'outdir': outdir,
     })
 
-    sen_jobid = 'compute_network_sensitivity_%d'%s
+    sen_jobid = utils.compute_network_sensitivity%('%d'%s)
     for ifo, paths in ifos.items():
         dag.write('PARENT %s CHILD %s\n'%(paths['horizon_jobid'], sen_jobid))
 
@@ -347,7 +349,7 @@ if opts.compute_exposure:
         exp_sub = open(exp_subname, 'w')
         exp_sub.write(utils.compute_exposure_sub%{\
             'universe' : opts.universe,
-            'exe' : opts.exposure_exe,
+            'exe' : os.path.abspath(find_executable(opts.exposure_exe)),
             'accounting_group' : opts.accounting_group,
             'accounting_group_user' : opts.accounting_group_user,
             'nside' : opts.nside,
@@ -366,7 +368,7 @@ if opts.compute_exposure:
             'normalize' : '--do-not-normalize',
             'retry' : opts.retry,
         })
-        exp_jobid = 'compute_exposure_%d'%smod
+        exp_jobid = utils.compute_exposure_jobid%smod
         exp_path = '%s/exposure_%d.fits.gz'%(outdir, smod)
 
         ### add parent/child
@@ -391,7 +393,7 @@ if opts.compute_exposure:
     exp_sub = open(exp_subname, 'w')
     exp_sub.write(utils.compute_exposure_sub%{\
         'universe' : opts.universe,
-        'exe' : opts.exposure_exe,
+        'exe' : os.path.abspath(find_executable(opts.exposure_exe)),
         'accounting_group' : opts.accounting_group,
         'accounting_group_user' : opts.accounting_group_user,
         'nside' : opts.nside,
@@ -411,7 +413,7 @@ if opts.compute_exposure:
         'normalize' : '--do-not-normalize' if opts.do_not_normalize else '',
         'retry' : opts.retry,
     })
-    exp_jobid = 'compute_exposure_EVERYTHING'
+    exp_jobid = utils.compute_exposure_jobid%'EVERYTHING'
 
     ### add parent/child
     if opts.verbose:

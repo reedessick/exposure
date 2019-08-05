@@ -9,6 +9,8 @@ import os
 import getpass
 import subprocess as sp
 
+from distutils.spawn import find_executable
+
 from argparse import ArgumentParser
 
 ### non-standard libraries
@@ -77,7 +79,7 @@ parser.add_argument('--condor-submit', default=False, action='store_true',
 
 args = parser.parse_args()
 
-stride = args.gpsstop - args.gpsstop
+stride = args.gpsstop - args.gpsstart
 
 if args.tag:
     filetag = "_"+args.tag
@@ -100,7 +102,7 @@ segments = datafind.exclude_flags(segments, args.exclude_flag, args.gpsstart, st
 
 ### check to make sure we have livetime left, etc
 assert len(segments), 'no remaining livetime after filtering by flags!'
-lvtm = sum([e-s for e, e in segments]) ### amount of time requested within segments
+lvtm = utils.livetime(segments) ### amount of time requested within segments
 
 #------------------------
 
@@ -111,12 +113,12 @@ if args.verbose:
 with open(mc_subname, 'w') as f:
     f.write(utils.monte_carlo_vt_sub%{\
         'universe' : args.universe,
-        'exe' : args.monte_carlo_exe,
+        'exe' : os.path.abspath(find_executable(args.monte_carlo_exe)),
         'population' : args.population,
         'snr_threshold' : args.snr_threshold,
         'min_num_samples' : args.min_num_samples,
         'error' : args.fractional_systematic_error,
-        'sources' : ' '.join('--source %s %s "%s"'%(ifo, opts.output_dir, args.tag) for ifo, _, _ in args.source),
+        'sources' : ' '.join('--source %s %s "%s"'%(ifo, args.output_dir, args.tag) for ifo, _, _ in args.source),
         'accounting_group' : args.accounting_group,
         'accounting_group_user' : args.accounting_group_user,
         'tag' :  "--tag "+args.tag if args.tag else '',
@@ -135,11 +137,11 @@ with open(dagname, 'w') as f:
         if args.verbose:
             print( "scheduling jobs for %d -- %d"%(segstart, segstop) )
 
-        s = (segstart/opts.win)*opts.win ### line-up start with integer number of windows. Needed to guarantee files will line up later -> integer division!
+        s = (segstart/args.win)*args.win ### line-up start with integer number of windows. Needed to guarantee files will line up later -> integer division!
         if s < segstart: ### mostly likely case, but we need to check just in case
-            s += opts.win
+            s += args.win
 
-        while s+opts.win < segstop:
+        while s+args.win < segstop:
             f.write(utils.monte_carlo_vt_dag%{\
                 'jobid' : '%d'%s,
                 'sub' : mc_subname,

@@ -9,6 +9,8 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 import os
 import getpass
 
+from distutils.spawn import find_executable
+
 from optparse import OptionParser
 
 ### non-standard libraries
@@ -69,7 +71,7 @@ if opts.verbose:
 f = open(subname, 'w')
 f.write(utils.compute_horizon_sub%{\
     'universe' : opts.universe,
-    'exe' : opts.exe,
+    'exe' : os.path.abspath(find_executable(opts.exe)),
     'accounting_group' : opts.accounting_group,
     'accounting_group_user' : opts.accounting_group_user,
     'filetag' : filetag,
