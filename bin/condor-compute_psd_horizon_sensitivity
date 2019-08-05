@@ -94,15 +94,15 @@ parser.add_option('', '--universe', default='vanilla', type='string',
 parser.add_option('', '--psd-exe', default='compute-psd', type='string',
     help='specify the explicit path to the executable. \
 DEFAULT=compute-psd')
-parser.add_option('', '--horizon-exe', default='compute_horizon', type='string',
+parser.add_option('', '--horizon-exe', default='compute-horizon', type='string',
     help='specify the explicit path to the executable. \
-DEFAULT=compute_horizon')
-parser.add_option('', '--sensitivity-exe', default='compute_network_sensitivity', type='string',
+DEFAULT=compute-horizon')
+parser.add_option('', '--sensitivity-exe', default='compute-network-sensitivity', type='string',
     help='specify the explicit path to the executable. \
-DEFAULT=compute_network_sensitivity')
-parser.add_option('', '--exposure-exe', default='compute_exposure', type='string',
+DEFAULT=compute-network-sensitivity')
+parser.add_option('', '--exposure-exe', default='compute-exposure', type='string',
     help='specify the explicit path to the executable. \
-DEFAULT=compute_exposure')
+DEFAULT=compute-exposure')
 
 parser.add_option('', '--accounting-group', default='ligo.dev.o1.burst.explore.test', type='string',
     help='DEFAULT=ligo.dev.o1.burst.explore.test')

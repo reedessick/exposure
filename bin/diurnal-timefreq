@@ -1,0 +1,34 @@
+#!/usr/bin/env python
+
+__doc__ = "compute a time-frequency representation of lock segments to estimate diurnal cycles and their variability"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import os
+
+from argparse import ArgumentParser
+
+#-------------------------------------------------
+
+parser = ArgumentParser(usage=__usage__, description=__doc__)
+
+parser.add_argument('gpsstart', type=float)
+parser.add_argument('gpsstop', type=float)
+
+parser.add_argument('-v', '--verbose', default=False, action='store_true')
+
+parser.add_argument('-o', '--output-dir', default='.', type=str)
+parser.add_argument('-t', '--tag', default='', type=str)
+
+args = parser.parse_args()
+
+if args.tag:
+    args.tag = "_"+args.tag
+
+if not os.path.exists(args.output_dir):
+    os.makedirs(args.output_dir)
+
+#-------------------------------------------------
+
+raise NotImplementedError

@@ -1,0 +1,114 @@
+#!/usr/bin/env python
+
+__doc__ = "massive parallelizatoin of compute_horizon"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import os
+import getpass
+
+from distutils.spawn import find_executable
+
+from argparse import ArgumentParser
+
+### non-standard libraries
+from exposure import utils
+
+#-------------------------------------------------
+
+parser = ArgumentParser(description=__doc__)
+
+parser.add_argument('psd', nargs="+", type=str)
+
+parser.add_argument("-v", "--verbose", default=False, action="store_true")
+
+parser.add_argument('--flow', default=32, type=float,
+    help='DEFAULT=32')
+parser.add_argument('--fhigh', default=1024, type=float,
+    help='DEFAULT=1024')
+
+parser.add_argument('--distance', default=100, type=float,
+    help='an arbitrary choice for the distance scale used to calculate the SNR and estimate the horizon')
+parser.add_argument('--snr-thr', default=8, type=float,
+    help='an arbitrary snr threshold defining what is detectable. Used to estimate the horizon')
+
+parser.add_argument('--universe', default='vanilla', type=str,
+    help='DEFAULT=vanilla')
+parser.add_argument('--exe', default='compute_horizon', type=str,
+    help='specify the explicit path to the executable. \
+DEFAULT=compute_horizon')
+
+parser.add_argument('--accounting-group', default='ligo.dev.o1.burst.explore.test', type=str,
+    help='DEFAULT=ligo.dev.o1.burst.explore.test')
+parser.add_argument('--accounting-group-user', default=getpass.getuser(), type=str,
+    help='DEFAULT='+getpass.getuser())
+
+parser.add_argument('--retry', default=0, type=int,
+    help='DEFAULT=0')
+
+parser.add_argument("-o", "--output-dir", default='.', type=str)
+parser.add_argument("-t", "--tag", default="", type=str)
+
+parser.add_argument('--condor-submit', default=False, action='store_true',
+    help='submit the DAG to condor')
+
+args = parser.parse_args()
+
+if args.tag:
+    filetag = "_"+args.tag
+else:
+    filetag = ""
+
+if not os.path.exists(args.output_dir):
+    os.makedirs(args.output_dir)
+
+#-------------------------------------------------
+
+### write sub file
+subname = "%s/compute_horizon%s.sub"%(args.output_dir, filetag)
+if args.verbose:
+    print( "writing : "+subname )
+f = open(subname, 'w')
+f.write(utils.compute_horizon_sub%{\
+    'universe' : args.universe,
+    'exe' : os.path.abspath(find_executable(args.exe)),
+    'accounting_group' : args.accounting_group,
+    'accounting_group_user' : args.accounting_group_user,
+    'filetag' : filetag,
+    'flow' : args.flow,
+    'fhigh' : args.fhigh,
+    'distance' : args.distance,
+    'snr_thr' : args.snr_thr,
+})
+f.close()
+
+### iterate over segments and define compute-psd jobs for each
+dagname = subname.replace('.sub', '.dag')
+if args.verbose:
+    print( "writing : "+dagname )
+f = open(dagname, 'w')
+
+for path in args:
+    tag = os.path.basename(path).strip('.txt.gz')
+    f.write(utils.compute_horizon_dag%{\
+        'sub' : subname,
+        'jobid' : tag, 
+        'path' : path,
+        'tag' : tag+args.tag,
+        'retry' : args.retry,
+        'outdir' : args.output_dir,
+    })
+f.close()
+
+#-------------------------------------------------
+
+### submit
+if args.condor_submit:
+    if args.verbose:
+        print( 'submitting : '+dagname )
+    import subprocess as sp
+    sp.Popen(['condor_submit_dag', dagname]).wait()
+
+elif args.verbose:
+    print( 'you can now submit : '+dagname )

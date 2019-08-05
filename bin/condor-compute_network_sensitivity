@@ -28,7 +28,7 @@ parser.add_option('', '--nside', default=512, type='int',
 
 parser.add_option('', '--universe', default='vanilla', type='string',
     help='DEFAULT=vanilla')
-parser.add_option('', '--exe', default='compute-psd', type='string',
+parser.add_option('', '--exe', default='compute-network-sensitivity', type='string',
     help='specify the explicit path to the executable. \
 DEFAULT=compute_psd')
 
