@@ -14,6 +14,7 @@ from argparse import ArgumentParser
 ### non-standard libraries
 from exposure import utils
 from exposure import datafind
+from exposure import montecarlo
 
 #-------------------------------------------------
 
@@ -56,7 +57,7 @@ DEFAULT=0.50')
 
 parser.add_argument('-s', '--source', default=[], required=True, nargs=3, type=str, action='append',
     help='a source of PSDs. This can be repeated to specify multiple IFOs. eg, "--source IFO channel ldr_type')
-parser.add_argument('--snr-threshold', default=DEFAULT_SNR_THRESHOLD, type=float,
+parser.add_argument('--snr-threshold', default=montecarlo.DEFAULT_SNR_THRESHOLD, type=float,
     help='the network SNR threshold for detection. Used within gw_event_gen.eventgen.Pdet to determine the probability of detecting a signal')
 
 parser.add_argument('-N', '--min-num-samples', default=montecarlo.DEFAULT_MIN_NUM_SAMPLES, type=int,
@@ -86,7 +87,7 @@ parser.add_argument('--retry', default=0, type=int,
 parser.add_argument("-o", "--output-dir", default='.', type=str)
 parser.add_argument("-t", "--tag", default="", type=str)
 
-parser.add_argument('-s', '--condor-submit', default=False, action='store_true',
+parser.add_argument('--condor-submit', default=False, action='store_true',
     help='submit the DAG to condor')
 
 args = parser.parse_args()
@@ -138,7 +139,7 @@ for ifo, channel, frametype in args.source:
             'channel' : channel,
             'frametype' : frametype,
             'accounting_group' : args.accounting_group,
-            'accounting_group_user' : args..accounting_group_user,
+            'accounting_group_user' : args.accounting_group_user,
             'tag' :  "--tag "+args.tag if args.tag else '',
             'filetag' : filetag,
             'seglen' : args.seglen,
@@ -159,7 +160,7 @@ with open(mc_subname, 'w') as f:
         'error' : args.fractional_systematic_error,
         'sources' : ' '.join('--source %s %s "%s"'%(ifo, opts.output_dir, args.tag) for ifo, _, _ in args.source),
         'accounting_group' : args.accounting_group,
-        'accounting_group_user' : args..accounting_group_user,
+        'accounting_group_user' : args.accounting_group_user,
         'tag' :  "--tag "+args.tag if args.tag else '',
         'filetag' : filetag,
     })

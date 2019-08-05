@@ -25,10 +25,6 @@ from gw_event_gen import eventgen
 
 #-------------------------------------------------
 
-DEFAULT_SNR_THRESHOLD = 8.
-
-#-------------------------------------------------
-
 parser = ArgumentParser(description=__doc__)
 
 parser.add_argument('population', type=str,
@@ -38,7 +34,7 @@ dynamically determine the maximum redshift for detectable sources given each set
 
 parser.add_argument('-s', '--source', default=[], required=True, nargs=3, type=str, action='append',
     help='a source of PSDs. This can be repeated to specify multiple IFOs. eg, "--source IFO rootdir tag')
-parser.add_argument('--snr-threshold', default=DEFAULT_SNR_THRESHOLD, type=float,
+parser.add_argument('--snr-threshold', default=montecarlo.DEFAULT_SNR_THRESHOLD, type=float,
     help='the network SNR threshold for detection. Used within gw_event_gen.eventgen.Pdet to determine the probability of detecting a signal')
 
 parser.add_argument('-r', '--require', default=[], type=str, action='append',
