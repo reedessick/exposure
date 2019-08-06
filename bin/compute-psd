@@ -61,6 +61,7 @@ assert args.seglen > args.overlap, '--seglen must be larger than --overlap'
 if args.tag:
     args.tag = "_"+args.tag
 
+args.output_dir = os.path.abspath(args.output_dir)
 if not os.path.exists(args.output_dir):
     os.makedirs(args.output_dir)
 

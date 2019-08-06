@@ -114,6 +114,7 @@ if args.tag:
 else:
     filetag = ""
 
+args.output_dir = os.path.abspath(args.output_dir)
 if not os.path.exists(args.output_dir):
     os.makedirs(args.output_dir)
 
@@ -132,6 +133,8 @@ for ifo, flag in args.exclude_flag:
 ### ensure we have proper coverage
 segments = dict()
 for ifo, _, _ in args.source:
+    if args.verbose:
+        print('quering flags for: '+ifo)
     segs = [[args.gpsstart, args.gpsstop]]
     segs = datafind.include_flags(segs, include_flag[ifo], args.gpsstart, stride, verbose=args.verbose)
     segs = datafind.exclude_flags(segs, exclude_flag[ifo], args.gpsstart, stride, verbose=args.verbose)
@@ -204,9 +207,9 @@ with open(dagname, 'w') as f:
         seg = [[segstart, segstop]]
         for ifo, _, _ in args.source: ### do this once for each IFO
             if utils.livetime(utils.andsegments(seg, segments[ifo]))==utils.livetime(seg):
-                present.append(utils.compute_psd_jobid%('%s-%d'%(ifo, segstart)))
+                present.append(ifo)
 
-        if (len(present) >= args.min_num_present) and np.all(ifo in present for ifo in args.require):
+        if (len(present) >= args.min_num_present) and all(ifo in present for ifo in args.require):
             sources = ""
             for ifo in present:
                 f.write(utils.compute_psd_dag%{\
@@ -217,7 +220,7 @@ with open(dagname, 'w') as f:
                     'retry' : args.retry,
                     'outdir' : args.output_dir,
                 })
-                sources += " --source %s %s \"%s\""%(ifo, args.output_dir, args.tag)
+                sources += " --source %s %s '%s%s'"%(ifo, args.output_dir, ifo, filetag)
 
             f.write(utils.monte_carlo_vt_dag%{\
                 'jobid' : '%d'%segstart,
@@ -239,7 +242,7 @@ with open(dagname, 'w') as f:
 
 #-------------------------------------------------
 
-if args.Verbose: ### report amount of time covered
+if args.verbose: ### report amount of time covered
     print( 'requested       : %d sec'%stride )
     print( 'covered by PSD  : %d sec'%covered )
 

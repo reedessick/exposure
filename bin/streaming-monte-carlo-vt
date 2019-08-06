@@ -82,6 +82,7 @@ if args.tag:
 
 args.source = [(ifo, rootdir, '_'+tag, ifo in args.require) for ifo, rootdir, tag in args.source]
 
+args.output_dir = os.path.abspath(args.output_dir)
 if not os.path.exists(args.output_dir):
     os.makedirs(args.output_dir)
 

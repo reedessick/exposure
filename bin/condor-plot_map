@@ -51,6 +51,7 @@ if opts.tag:
 else:
     filetag = ''
 
+args.output_dir = os.path.abspath(args.output_dir)
 if not os.path.exists(opts.output_dir):
     os.makedirs(opts.output_dir)
 

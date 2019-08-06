@@ -54,6 +54,7 @@ assert len(args), 'please supply at least one input argument or --cache'
 if args.tag:
     args.tag = "_"+args.tag
 
+args.output_dir = os.path.abspath(args.output_dir)
 if not os.path.exists(args.output_dir):
     os.makedirs(args.output_dir)
 
