@@ -70,13 +70,11 @@ parser.add_argument('--universe', default='vanilla', type=str,
 parser.add_argument('--exe', default='monte-carlo-vt', type=str,
     help='specify the explicit path to the executable.')
 
-parser.add_argument('--accounting-group', default='ligo.dev.o1.burst.explore.test', type=str,
-    help='DEFAULT=ligo.dev.o1.burst.explore.test')
+parser.add_argument('--accounting-group', default=utils.DEFAULT_ACCOUNTING_GROUP, type=str)
 parser.add_argument('--accounting-group-user', default=getpass.getuser(), type=str,
     help='DEFAULT='+getpass.getuser())
 
-parser.add_argument('--retry', default=0, type=int,
-    help='DEFAULT=0')
+parser.add_argument('--retry', default=utils.DEFAULT_RETRY, type=int)
 
 parser.add_argument("-o", "--output-dir", default='.', type=str)
 parser.add_argument("-t", "--tag", default="", type=str)

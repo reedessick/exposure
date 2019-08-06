@@ -108,13 +108,11 @@ parser.add_argument('--exposure-exe', default='compute-exposure', type=str,
     help='specify the explicit path to the executable. \
 DEFAULT=compute-exposure')
 
-parser.add_argument('--accounting-group', default='ligo.dev.o1.burst.explore.test', type=str,
-    help='DEFAULT=ligo.dev.o1.burst.explore.test')
+parser.add_argument('--accounting-group', default=utils.DEFAULT_ACCOUNTING_GROUP, type=str)
 parser.add_argument('--accounting-group-user', default=getpass.getuser(), type=str,
     help='DEFAULT='+getpass.getuser())
 
-parser.add_argument('--retry', default=0, type=int,
-    help='DEFAULT=0')
+parser.add_argument('--retry', default=utils.DEFAULT_RETRY, type=int)
 
 parser.add_argument('--condor-submit', default=False, action='store_true',
     help='submit the DAG to condor')

@@ -40,13 +40,11 @@ parser.add_option('', '--exe', default='compute_psd', type='string',
     help='specify the explicit path to the executable. \
 DEFAULT=compute_psd')
 
-parser.add_option('', '--accounting-group', default='ligo.dev.o1.burst.explore.test', type='string',
-    help='DEFAULT=ligo.dev.o1.burst.explore.test')
+parser.add_option('', '--accounting-group', default=utils.DEFAULT_ACCOUNTING_GROUP, type='string')
 parser.add_option('', '--accounting-group-user', default=getpass.getuser(), type='string',
     help='DEFAULT='+getpass.getuser())
 
-parser.add_option('', '--retry', default=0, type='int', 
-    help='DEFAULT=0')
+parser.add_option('', '--retry', default=utils.DEFAULT_RETRY, type='int')
 
 parser.add_option("-o", "--output-dir", default='.', type='string')
 parser.add_option("-t", "--tag", default="", type='string')

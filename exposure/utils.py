@@ -10,6 +10,11 @@ import numpy as np
 
 #-------------------------------------------------
 
+DEFAULT_ACCOUNTING_GROUP = 'ligo.dev.o1.burst.explore.test' 
+DEFAULT_RETRY = 0
+
+#-------------------------------------------------
+
 ### define template strings here for easy reference between multiple scripts!
 compute_horizon_sub = '''\
 universe = %(universe)s
