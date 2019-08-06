@@ -33,11 +33,11 @@ parser.add_argument('gpsstop', type=float)
 parser.add_argument("-v", "--verbose", default=False, action="store_true")
 parser.add_argument("-V", "--Verbose", default=False, action="store_true")
 
-parser.add_argument("--include-flag", default=[], type=str, action='append',
-    help='the flags used to select subsets of [gpsstart, gpsstop] for analysis. \
+parser.add_argument("--include-flag", default=[], nargs=2, type=str, action='append',
+    help='the flags used to select subsets of [gpsstart, gpsstop] for analysis; eg. "--include-flag H H1:DMT-ANALYSIS_READY:1". \
 Can be repeated to take the intersection of multiple flags. \
 DEFAULT=[] (analyze all time in [gpsstart, gpsstop]).')
-parser.add_argument("--exclude-flag", default=[], type=str, action='append',
+parser.add_argument("--exclude-flag", default=[], nargs=2, type=str, action='append',
     help='the same as --include-flag, except we only retain times that are \
 outside of these flags instead of inside them')
 
@@ -91,18 +91,26 @@ if not os.path.exists(args.output_dir):
 
 args.verbose |= args.Verbose
 
+include_flag = defaultdict(list)
+for ifo, flag in args.include_flag:
+    include_flag[ifo].append(flag)
+exclude_flag = defaultdict(list)
+for ifo, flag in args.exclude_flag:
+    exclude_flag[ifo].append(flag)
+
 #-------------------------------------------------
 
 ### query segments to define individual runs
 ### ensure we have proper coverage
-segments = [[args.gpsstart, args.gpsstop]]
-
-segments = datafind.include_flags(segments, args.include_flag, args.gpsstart, stride, verbose=args.verbose)
-segments = datafind.exclude_flags(segments, args.exclude_flag, args.gpsstart, stride, verbose=args.verbose)
+segments = dict()
+for ifo, _, _ in args.source:
+    segs = [[args.gpsstart, args.gpsstop]]
+    segs = datafind.include_flags(segs, include_flag[ifo], args.gpsstart, stride, verbose=args.verbose)
+    segs = datafind.exclude_flags(segs, exclude_flag[ifo], args.gpsstart, stride, verbose=args.verbose)
+    segments[ifo] = segs
 
 ### check to make sure we have livetime left, etc
-assert len(segments), 'no remaining livetime after filtering by flags!'
-lvtm = utils.livetime(segments) ### amount of time requested within segments
+assert sum(len(val) for val in segments.values()), 'no remaining livetime after filtering by flags!'
 
 #------------------------
 
@@ -118,7 +126,6 @@ with open(mc_subname, 'w') as f:
         'snr_threshold' : args.snr_threshold,
         'min_num_samples' : args.min_num_samples,
         'error' : args.fractional_systematic_error,
-        'sources' : ' '.join('--source %s %s "%s"'%(ifo, rootdir, tag) for ifo, rootdir, tag in args.source),
         'accounting_group' : args.accounting_group,
         'accounting_group_user' : args.accounting_group_user,
         'tag' :  "--tag "+args.tag if args.tag else '',
@@ -132,33 +139,45 @@ if args.verbose:
 with open(dagname, 'w') as f:
 
     covered = 0 ### amount of time that's covered by a PSD estimate
-    for segstart, segstop in segments:
-        segdur = segstop - segstart
-        if args.verbose:
+
+    segstart = (int(args.gpsstart)/args.win)*args.win ### line-up start with integer number of windows. Needed to guarantee files will line up later -> integer division!
+    if segstart < args.gpsstart: ### mostly likely case, but we need to check just in case
+        segstart += args.win
+
+    segstop = segstart + args.win
+
+    while segstop < args.gpsstop: ### analyze every possible stride...
+        if args.Verbose:
             print( "scheduling jobs for %d -- %d"%(segstart, segstop) )
 
-        s = (segstart/args.win)*args.win ### line-up start with integer number of windows. Needed to guarantee files will line up later -> integer division!
-        if s < segstart: ### mostly likely case, but we need to check just in case
-            s += args.win
+        ### figure out which IFOs are active during this stride
+        present = []
+        sources = ""
+        for ifo, rootdir, tag in args.source: ### do this once for each IFO
+            if utils.livetime(utils.andsegments(seg, segments[ifo])):
+                present.append(utils.compute_psd_jobid%('%s-%d'%(ifo, segstart)))
+                sources =+ " --sources %s %s %s"%(ifo, rootdir, tag)
 
-        while s+args.win < segstop:
+        if (len(present) >= args.min_num_present) and np.all(ifo in present for ifo in args.require):
             f.write(utils.monte_carlo_vt_dag%{\
-                'jobid' : '%d'%s,
+                'jobid' : '%d'%segstart,
                 'sub' : mc_subname,
-                'gpsstart' : s,
-                'gpsstop' : s+args.win,
+                'gpsstart' : segstart,
+                'gpsstop' : segstop,
+                'sources' : sources,
                 'retry' : args.retry,
                 'outdir' : args.output_dir,
             })
 
-            s += args.win
             covered += args.win
+
+        segstart = segstop
+        segstop += args.win
 
 #-------------------------------------------------
 
 if args.Verbose: ### report amount of time covered
     print( 'requested       : %d sec'%stride )
-    print( 'within segments : %d sec'%lvtm )
     print( 'covered by PSD  : %d sec'%covered )
 
 ### submit
