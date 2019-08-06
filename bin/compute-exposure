@@ -1,0 +1,76 @@
+#!/usr/bin/env python
+
+__doc__ = "sum together exposure estimates"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import os
+
+import numpy as np
+import healpy as hp
+
+from argparse import ArgumentParser
+
+### non-standard libraries
+from skymap_statistics import stats
+
+#-------------------------------------------------
+
+parser = ArgumentParser(description=__doc__)
+
+parser.add_argument('network', nargs='+', type=str)
+
+parser.add_argument('-v', '--verbose', default=False, action='store_true')
+
+parser.add_argument('--cache', default=False, type=str,
+    help='supply the path to a single file which lists all the network.fits.gz rather than listing them as input arguments. \
+File will be read and its contents appended to the list of input arguments. \
+DEFAULT=None')
+
+parser.add_argument('--index', default=3., type=int, 
+    help='the power to which we raise each map as it is read in before adding it to the cumulative sum. \
+DEFAULT=3 (volumetric weighting).')
+
+parser.add_argument('--nside', default=256, type=int,
+    help='resample all network.fits.gz to this NSIDE before summing')
+
+parser.add_argument('--do-not-normalize', default=False, action='store_true',
+    help='do not normalize total exposure so it sums to 1')
+
+parser.add_argument('-o', '--output-dir', default='.', type=str)
+parser.add_argument('-t', '--tag', default='', type=str)
+
+args = parser.parse_args()
+
+if args.cache:
+    if args.verbose:
+        print( 'reading FITS from cache : '+args.cache )
+    with open(args.cache, 'r') as f:
+        args += [_.strip() for _ in f.readlines()]
+
+assert len(args), 'please supply at least one input argument or --cache'
+
+if args.tag:
+    args.tag = "_"+args.tag
+
+args.output_dir = os.path.abspath(args.output_dir)
+if not os.path.exists(args.output_dir):
+    os.makedirs(args.output_dir)
+
+#-------------------------------------------------
+
+exposure = np.zeros((hp.nside2npix(args.nside),), dtype=float)
+
+for path in args:
+    if args.verbose:
+        print( "reading : "+path )
+    exposure += stats.resample(hp.read_map(path, verbose=False), args.nside)**args.index ### weight by volume
+
+if not args.do_not_normalize:
+    exposure /= np.sum(exposure)
+
+path = "%s/exposure%s.fits.gz"%(args.output_dir, args.tag)
+if args.verbose:
+    print( "writing : "+path )
+hp.write_map(path, exposure, coord='C')

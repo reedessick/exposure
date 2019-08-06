@@ -22,6 +22,8 @@ except ImportError: ### Python2 vs Python3
 DEFAULT_MIN_NUM_SAMPLES = 100
 DEFAULT_ERROR = np.infty
 
+DEFAULT_SNR_THRESHOLD = 8.
+
 #-------------------------------------------------
 
 ### basic config parsing

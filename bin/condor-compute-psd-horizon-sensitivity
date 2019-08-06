@@ -1,0 +1,449 @@
+#!/usr/bin/env python
+
+__doc_ = "write a single DAG for the psd -> horizon -> sensitivity workflow"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import os
+import getpass
+import subprocess as sp
+
+from collections import defaultdict
+
+from distutils.spawn import find_executable
+
+from argparse import ArgumentParser
+
+### non-standard libraries
+from exposure import utils
+from exposure import datafind
+
+from skymap_statistics import detector_cache
+
+#-------------------------------------------------
+
+parser = ArgumentParser(description=__doc__)
+
+parser.add_argument('gpstart', type=float)
+parser.add_argument('gpsstop', type=float)
+
+parser.add_argument('-v', '--verbose', default=False, action='store_true')
+parser.add_argument('-V', '--Verbose', default=False, action='store_true')
+
+### general IFO specifications
+parser.add_argument('-s', '--source', nargs=3, default=[], type=str, action='append',
+    help='triples of IFO channel frametype. e.g.: "L L1:GDS-CALIB_STRAIN L1_HOFT_C00". \
+can specify multiple detectors by repeating this option. \
+DEFAULT=[]')
+
+### options to figure out what data to pick up
+parser.add_argument("--include-flag", default=[], nargs=2, type=str, action='append',
+    help='the ifo, flag pairs used to select subsets of [gpsstart, gpsstop] for analysis. \
+Can be repeated to take the intersection of multiple flags, but intersections are taken for each IFO separately. \
+DEFAULT=[] (analyze all time in [gpsstart, gpsstop]).')
+
+parser.add_argument("--exclude-flag", default=[], nargs=2, type=str, action='append',
+    help='the same as --include-flag, except we only retain times that are \
+outside of these flags instead of inside them')
+
+parser.add_argument('-r', '--require', default=[], type=str, action='append',
+    help='require the PSD from this IFO to be present. Can be repeated to require multiple IFOs')
+parser.add_argument('--min-num-present', default=1, type=int,
+    help='the minimum number of PSDs that must be present to process a stride')
+
+### options for how to compute PSD
+parser.add_argument("--win", default=60, type=int,
+    help="estimate PSDs separately in sequential windows of this duration. \
+DEFAULT=60")
+
+parser.add_argument("--seglen", default=4, type=int,
+    help='the length of segments used to estimate the PSD via an averaging procedure (specify in seconds). \
+NOTE: if we do not obtain an integer number of segments based on --seglen, --overlap, gpsstart, and gpsstop, \
+we will raise a ValueError. DEFAULT=4')
+parser.add_argument("--overlap", default=2, type=float,
+    help='the amount of time overlapped for segments used to estimate the PSD (specify in seconds). \
+NOTE: if we do not obtain an integer number of segments based on --seglen, --overlap, gpsstart, and gpsstop, \
+we will raise a ValueError. DEFAULT=2')
+parser.add_argument("--tukey-alpha", default=0.50, type=float,
+    help='the Tukey "alpha" value used for windowing the DFT. \
+DEFAULT=0.50')
+
+### options for how to estimate horizon
+parser.add_argument('--flow', default=32, type=float,
+    help='DEFAULT=32')
+parser.add_argument('--fhigh', default=1024, type=float,
+    help='DEFAULT=1024')
+
+parser.add_argument('--distance', default=100, type=float,
+    help='an arbitrary choice for the distance scale used to calculate the SNR and estimate the horizon')
+parser.add_argument('--snr-thr', default=8, type=float,
+    help='an arbitrary snr threshold defining what is detectable. Used to estimate the horizon')
+
+### options for network sensitivity
+parser.add_argument('--nside', default=512, type=int,
+    help='the NSIDE resolution for the resulting FITS files')
+
+### options for computing exposure
+parser.add_argument('--compute-exposure', default=False, action='store_true',
+    help='add compute_exposure jobs to the DAG to stack everything together')
+
+parser.add_argument('--do-not-normalize', default=False, action='store_true',
+    help='do not normalize total exposure so it sums to 1')
+
+### options for condor
+parser.add_argument('--universe', default='vanilla', type=str,
+    help='DEFAULT=vanilla')
+
+parser.add_argument('--psd-exe', default='compute-psd', type=str,
+    help='specify the explicit path to the executable. \
+DEFAULT=compute-psd')
+parser.add_argument('--horizon-exe', default='compute-horizon', type=str,
+    help='specify the explicit path to the executable. \
+DEFAULT=compute-horizon')
+parser.add_argument('--sensitivity-exe', default='compute-network-sensitivity', type=str,
+    help='specify the explicit path to the executable. \
+DEFAULT=compute-network-sensitivity')
+parser.add_argument('--exposure-exe', default='compute-exposure', type=str,
+    help='specify the explicit path to the executable. \
+DEFAULT=compute-exposure')
+
+parser.add_argument('--accounting-group', default='ligo.dev.o1.burst.explore.test', type=str,
+    help='DEFAULT=ligo.dev.o1.burst.explore.test')
+parser.add_argument('--accounting-group-user', default=getpass.getuser(), type=str,
+    help='DEFAULT='+getpass.getuser())
+
+parser.add_argument('--retry', default=0, type=int,
+    help='DEFAULT=0')
+
+parser.add_argument('--condor-submit', default=False, action='store_true',
+    help='submit the DAG to condor')
+
+### options for output formatting
+parser.add_argument("-o", "--output-dir", default='.', type=str)
+parser.add_argument("-t", "--tag", default="", type=str)
+
+#------------------------
+
+args = parser.parse_args()
+
+gpsstart, gpsstop = args.gpsstart, args.gpsstop
+stride = gpsstop - gpsstart
+
+assert args.seglen > args.overlap, '--seglen must be larger than --overlap'
+
+for ifo, channel, frametype in args.source:
+    assert detector_cache.detectors.has_key(ifo), 'IFO=%s not known'%(ifo)
+    assert ifo==channel[0], 'I do not believe you want an IFO and channel \
+from different instruments\n\tIFO : %s\n\tchannel : %s'%(ifo, channel)
+    assert ifo==frametype[0], 'I do not believe you want an IFO and frametype \
+from different instruments\n\tIFO : %s\n\tframetype : %s'%(ifo, frametype)
+
+if args.tag:
+    filetag = "_"+args.tag
+else:
+    filetag = ""
+
+args.output_dir = os.path.abspath(args.output_dir)
+if not os.path.exists(args.output_dir):
+    os.makedirs(args.output_dir)
+
+args.verbose |= args.Verbose
+
+#-----------
+
+include_flag = defaultdict(list)
+for ifo, flag in args.include_flag:
+    include_flag[ifo].append(flag)
+
+exclude_flag = defaultdict(list)
+for ifo, flag in args.exclude_flag:
+    exclude_flag[ifo].append(flag)
+
+time_periods = defaultdict( dict )
+
+#-------------------------------------------------
+
+### set up DAG
+dagname = "%s/compute_psd_horizon_sensitivity%s.dag"%(args.output_dir, filetag)
+if args.verbose:
+    print( "writing : "+dagname )
+dag = open(dagname, 'w')
+
+#------------------------
+
+### figure out segments
+segsdict = dict()
+for ifo, channel, frametype in args.source:
+    if args.verbose:
+        print('quering flags for: '+ifo)
+    segsdict[ifo] = [[gpsstart, gpsstop]]
+    segsdict[ifo] = datafind.include_flags(segsdict[ifo], include_flag[ifo], gpsstart, stride, verbose=args.verbose)
+    segsdict[ifo] = datafind.exclude_flags(segsdict[ifo], exclude_flag[ifo], gpsstart, stride, verbose=args.verbose)
+
+### check to make sure we have livetime left, etc
+assert sum(len(val) for val in segsdict.values()), 'no remaining livetime after filtering by flags!'
+
+### figure out which PSDs will be available when
+if args.verbose:
+    print( 'setting up PSD generation' )
+
+for ifo, channel, frametype in args.source:
+
+    #-------
+
+    subtag = '--tag '+args.tag+ifo
+
+    ### write PSD sub file
+    psd_subname = "%s/compute_psd%s-%s.sub"%(args.output_dir, filetag, ifo)
+    if args.verbose:
+        print( "writing : "+psd_subname )
+    with open(psd_subname, 'w') as sub:
+        sub.write(utils.compute_psd_sub%{\
+            'universe' : args.universe,
+            'exe' : os.path.abspath(find_executable(args.psd_exe)),
+            'channel' : channel,
+            'frametype' : frametype,
+            'accounting_group' : args.accounting_group,
+            'accounting_group_user' : args.accounting_group_user,
+            'tag' :  subtag,
+            'filetag' : filetag,
+            'start' : gpsstart,
+            'dur' : gpsstop-gpsstart,
+            'seglen' : args.seglen,
+            'overlap' : args.overlap,
+            'tukey_alpha' : args.tukey_alpha,
+        })
+
+    ### write horizon sub file
+    hor_subname = "%s/compute_horizon%s-%s.sub"%(args.output_dir, filetag, ifo)
+    if args.verbose:
+        print( "writing : "+hor_subname )
+    with open(hor_subname, 'w') as sub:
+        sub.write(utils.compute_horizon_sub%{\
+            'universe' : args.universe,
+            'exe' : os.path.abspath(find_executable(args.horizon_exe)),
+            'accounting_group' : args.accounting_group,
+            'accounting_group_user' : args.accounting_group_user,
+            'filetag' : filetag,
+            'flow' : args.flow,
+            'fhigh' : args.fhigh,
+            'distance' : args.distance,
+            'snr_thr' : args.snr_thr,
+        })
+
+### filter segments to figure out which we want to analyze
+
+segstart = (int(gpsstart)/args.win)*args.win
+if segstart < gpsstart:
+    segstart += args.win
+segstop = segstart + args.win
+
+covered = 0
+while segstart+args.win < gpsstop:
+
+    if args.Verbose:
+        print( "scheduling jobs for %d -- %d"%(segstart, segstop) )
+
+    present = []
+    seg = [[segstart, segstop]]
+    for ifo, segments in segsdict.items():
+        if utils.livetime(utils.andsegments(seg, segments))==utils.livetime(seg):
+            present.append(ifo)
+
+    if (len(present) >= args.min_num_present) and all(ifo in present for ifo in args.require):
+        for ifo in present:
+
+            outdir = utils.gps2dir(args.output_dir, segstart, args.win)
+            if not os.path.exists(outdir):
+                os.makedirs(outdir)
+
+            ### add the PSD generation
+            dag.write(utils.compute_psd_dag%{\
+                'jobid' : '%s-%d'%(ifo, segstart),
+                'sub' : psd_subname,
+                'gpsstart' : segstart,
+                'gpsstop' : segstop,
+                'retry' : args.retry,
+                'outdir' : outdir,
+            })
+            psd_path = utils.psd_path(outdir, '%s%s'%(filetag, ifo), segstart, args.win) ### should produce this path
+
+            ### add the horizon computation
+            dag.write(utils.compute_horizon_dag%{\
+                'jobid' : '%s-%d'%(ifo, segstart),
+                'sub' : hor_subname,
+                'path' : psd_path,
+                'tag' : subtag,
+                'retry' : args.retry,
+                'outdir' : outdir,
+            })
+            horizon_path = utils.horizon_path(outdir, '%s%s'%(filetag, ifo), segstart, args.win) ### should produce this path
+
+            ### add parent child relationships
+            psd_jobid = utils.compute_psd_jobid%('%s-%d'%(ifo, segstart))
+            horizon_jobid = utils.compute_horizon_jobid%('%s-%d'%(ifo, segstart))
+            dag.write('PARENT %s CHILD %s\n'%(psd_jobid, horizon_jobid))
+
+            ### update book keeping
+            time_periods[segstart].update({
+                ifo:{
+#                    'psd': psd_path,
+#                    'psd_jobid' : psd_jobid,
+                    'horizon' : horizon_path,
+                    'horizon_jobid' : horizon_jobid,
+                },
+            })
+
+        covered += args.win
+
+    segstart = segstop
+    segstop += args.win
+
+if args.verbose: ### report amount of time covered
+    print( 'requested       : %d sec'%(gpsstop-gpsstart) )
+    print( 'covered by PSD  : %d sec'%covered )
+
+### add network sensitivity jobs
+sen_subname = "%s/compute_network_sensitivity%s.sub"%(args.output_dir, filetag)
+if args.verbose:
+    print( "writing : "+sen_subname )
+sen_sub = open(sen_subname, 'w')
+sen_sub.write(utils.compute_network_sensitivity_sub%{\
+    'universe' : args.universe,
+    'exe' : os.path.abspath(find_executable(args.sensitivity_exe)),
+    'accounting_group' : args.accounting_group,
+    'accounting_group_user' : args.accounting_group_user,
+    'nside' : args.nside,
+    'filetag' : filetag,
+})
+sen_sub.close()
+
+if args.compute_exposure: ### needed for book-keeping for how we structure the compute-exposure jobs
+    long_periods = defaultdict( list )
+
+for s, ifos in time_periods.items():
+    outdir = utils.gps2dir(args.output_dir, s, args.win) ### should already exist!
+    gps = s + 0.5*args.win ### take the center of the window, which should be good enough...
+    dag.write(utils.compute_network_sensitivity_dag%{\
+        'jobid' : '%d'%s,
+        'sub' : sen_subname,
+        'gps' : gps, 
+        'tag' : args.tag,
+        'ifo_horizons' : '--ifo-horizon '+' --ifo-horizon '.join('%s %s'%(ifo, paths['horizon']) for ifo, paths in ifos.items()),
+        'retry' : args.retry,
+        'outdir': outdir,
+    })
+
+    sen_jobid = utils.compute_network_sensitivity%('%d'%s)
+    for ifo, paths in ifos.items():
+        dag.write('PARENT %s CHILD %s\n'%(paths['horizon_jobid'], sen_jobid))
+
+    if args.compute_exposure: ### record jobid for future reference
+        long_periods[s/100000].append({\
+            'sen_jobid' : sen_jobid,
+            'sen_path' : utils.sensitivity_path(outdir, filetag, gps, gzip=True),
+        })
+
+### add compute_exposure job
+if args.compute_exposure:
+
+    exposures = [] ### list of all the smaller exposure jobs we gobble together
+    for smod, paths in long_periods.items():
+        ### write sub file
+        outdir = os.path.join(args.output_dir, '%d'%smod)
+        exp_cachename = "%s/compute_exposure-%d.cache"%(outdir, smod)
+        exp_subname = "%s/compute_exposure%s-%d.sub"%(args.output_dir, filetag, smod)
+        if args.verbose:
+            print( "writing : "+exp_subname )
+        exp_sub = open(exp_subname, 'w')
+        exp_sub.write(utils.compute_exposure_sub%{\
+            'universe' : args.universe,
+            'exe' : os.path.abspath(find_executable(args.exposure_exe)),
+            'accounting_group' : args.accounting_group,
+            'accounting_group_user' : args.accounting_group_user,
+            'nside' : args.nside,
+            'index' : 3, ### weight by volume here
+            'outdir' : outdir,
+            'tag' : "--tag %d"%smod, 
+            'filetag' : filetag,
+        })
+        exp_sub.close()
+
+        ### add job to dag
+        dag.write(utils.compute_exposure_dag%{\
+            'jobid' : '%d'%smod,
+            'sub' : exp_subname,
+            'FITS' : '--cache '+exp_cachename,
+            'normalize' : '--do-not-normalize',
+            'retry' : args.retry,
+        })
+        exp_jobid = utils.compute_exposure_jobid%smod
+        exp_path = '%s/exposure_%d.fits.gz'%(outdir, smod)
+
+        ### add parent/child
+        if args.verbose:
+            print( 'writing : '+exp_cachename )
+        exp_cache = open(exp_cachename, 'w')
+        for val in paths:
+            dag.write('PARENT %s CHILD %s\n'%(val['sen_jobid'], exp_jobid))
+            exp_cache.write('%s\n'%val['sen_path'])
+        exp_cache.close()
+
+        exposures.append({\
+            'exp_jobid' : exp_jobid, 
+            'exp_path' : exp_path,
+        })
+
+    ### add in final exposure job
+    exp_cachename = "%s/compute_exposure%s.cache"%(args.output_dir, filetag)
+    exp_subname = "%s/compute_exposure%s.sub"%(args.output_dir, filetag)
+    if args.verbose:
+        print( "writing : "+exp_subname )
+    exp_sub = open(exp_subname, 'w')
+    exp_sub.write(utils.compute_exposure_sub%{\
+        'universe' : args.universe,
+        'exe' : os.path.abspath(find_executable(args.exposure_exe)),
+        'accounting_group' : args.accounting_group,
+        'accounting_group_user' : args.accounting_group_user,
+        'nside' : args.nside,
+        'index' : 1, ### already weighted by volume, so just sum them here
+        'outdir' : args.output_dir,
+        'tag' : '--tag '+args.tag if args.tag else '', 
+        'filetag' : filetag,
+    })
+    exp_sub.close()
+
+    ### add job to dag
+    dag.write(utils.compute_exposure_dag%{\
+        'jobid' : 'EVERYTHING',
+        'sub' : exp_subname,
+#        'FITS' : ' '.join(_['exp_path'] for _ in exposures),
+        'FITS' : '--cache '+exp_cachename,
+        'normalize' : '--do-not-normalize' if args.do_not_normalize else '',
+        'retry' : args.retry,
+    })
+    exp_jobid = utils.compute_exposure_jobid%'EVERYTHING'
+
+    ### add parent/child
+    if args.verbose:
+        print( 'writing : '+exp_cachename )
+    exp_cache = open(exp_cachename, 'w')
+    for val in exposures:
+        dag.write('PARENT %s CHILD %s\n'%(val['exp_jobid'], exp_jobid))
+        exp_cache.write('%s\n'%val['exp_path'])
+    exp_cache.close()
+
+### done with the DAG
+dag.close()
+
+#-------------------------------------------------
+
+### submit
+if args.condor_submit:
+    if args.verbose:
+        print( 'submitting : '+dagname )
+    sp.Popen(['condor_submit_dag', dagname]).wait()
+
+elif args.verbose:
+    print( 'you can now submit : '+dagname )

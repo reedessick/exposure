@@ -9,6 +9,8 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 import os
 import getpass
 
+from distutils.spawn import find_executable
+
 from optparse import OptionParser
 
 #-------------------------------------------------
@@ -22,9 +24,9 @@ parser.add_option('', '--coord', default='C', type='string',
 
 parser.add_option('', '--universe', default='vanilla', type='string',
     help='DEFAULT=vanilla')
-parser.add_option('', '--exe', default='plot_maps.py', type='string',
+parser.add_option('', '--exe', default='plot-maps', type='string',
     help='specify the explicit path to the executable. \
-DEFAULT=compute_psd')
+DEFAULT=plot-maps')
 
 parser.add_option('', '--accounting-group', default='ligo.dev.o1.burst.explore.test', type='string',
     help='DEFAULT=ligo.dev.o1.burst.explore.test')
@@ -49,6 +51,7 @@ if opts.tag:
 else:
     filetag = ''
 
+args.output_dir = os.path.abspath(args.output_dir)
 if not os.path.exists(opts.output_dir):
     os.makedirs(opts.output_dir)
 
@@ -61,7 +64,7 @@ if opts.verbose:
 f = open(subname, 'w')
 f.write(utils.plot_maps_sub%{\
     'universe' : opts.universe,
-    'exe' : opts.exe,
+    'exe' : os.path.abspath(find_executable(opts.exe)),
     'accounting_group' : opts.accounting_group,
     'accounting_group_user' : opts.accounting_group_user,
     'filetag' : filetag,
@@ -70,7 +73,7 @@ f.write(utils.plot_maps_sub%{\
 })
 f.close()
 
-### iterate over segments and define compute_psd jobs for each
+### iterate over segments and define plot-maps jobs for each
 dagname = subname.replace('.sub', '.dag')
 if opts.verbose:
     print( "writing : "+dagname )

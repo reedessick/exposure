@@ -1,0 +1,65 @@
+#!/usr/bin/env python
+
+__doc__ = "computes the expected range given the PSD. NOTE: this is only an approximation to the range using a very basic PN expression for a conformal waveform strain in the frequency domain. We may want to improve this by actually calling waveform generators to compute the strain"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import os
+
+import numpy as np
+
+from argparse import ArgumentParser
+
+### non-standard libraries
+from exposure import utils
+from exposure import simulation
+from skymap_statistics import detector_cache
+
+#-------------------------------------------------
+
+parser = ArgumentParser(description=__description__)
+
+parser.add_argument('psd', type=str)
+
+parser.add_argument('-v', '--verbose', default=False, action='store_true')
+
+parser.add_argument('', '--flow', default=simulation.DEFAULT_FLOW, type=float,
+    help='DEFAULT=%.3f'%simulation.DEFAULT_FLOW)
+parser.add_argument('', '--fhigh', default=simulation.DEFAULT_FHIGH, type=float,
+    help='DEFAULT=%.3f'%simulation.DEFAULT_FHIGH)
+
+parser.add_argument('', '--snr-thr', default=simulation.DEFAULT_SNR_THRESHOLD, type=float,
+    help='an arbitrary snr threshold defining what is detectable. Used to estimate the horizon')
+
+parser.add_argument('-o', '--output-dir', default='.', type='string')
+parser.add_argument('-t', '--tag', default='', type='string')
+
+args = parser.parse_args()
+
+assert len(args)==1, 'please supply exactly 1 input argument\n%s'%__usage__
+
+if args.tag:
+    args.tag = "_"+args.tag
+
+args.output_dir = os.path.abspath(args.output_dir)
+if not os.path.exists(args.output_dir):
+    os.makedirs(args.output_dir)
+
+gpstart, gpsdur = [int(_) for _ in args.psd.strip('.txt.gz').split('-')[-2:]] ### need this to identify time range of data used
+
+#-------------------------------------------------
+
+if args.verbose:
+    print( "reading : "+args.psd )
+psd = detector_cache.PSD(*utils.retrieve_psd(args.psd)) ### freq, psd
+detector = detector_cache.Detector('dummy', [0,0,0], [1,0,0], [0,1,0], psd=psd)
+
+### compute the horizon for this detector
+horizon = simulation.detector2horizon(detector, args.snr_thr, flow=args.flow, fhigh=args.fhigh)[0][1]
+
+### save
+path = utils.horizon_path(args.output_dir, args.tag, gpstart, gpsdur)
+if args.verbose:
+    print( 'writing : '+path )
+utils.report_horizon(path, horizon, args.flow, args.fhigh, args.psd)

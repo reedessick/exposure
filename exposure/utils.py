@@ -24,6 +24,7 @@ output = $(outdir)/condor-compute_horizon%(filetag)s_$(Cluster)-$(Process).out
 notification = never
 queue 1'''
 
+compute_horizon_jobid = "compute_horizon_%s"
 compute_horizon_dag = '''\
 JOB    compute_horizon_%(jobid)s %(sub)s
 VARS   compute_horizon_%(jobid)s path="%(path)s" tag="%(tag)s" outdir="%(outdir)s"
@@ -43,6 +44,7 @@ output = $(outdir)/condor-compute_network_sensitivity%(filetag)s_$(Cluster)-$(Pr
 notification = never
 queue 1'''
 
+compute_network_sensitivity_jobid = "compute_network_sensitivity_%s"
 compute_network_sensitivity_dag = '''\
 JOB    compute_network_sensitivity_%(jobid)s %(sub)s
 VARS   compute_network_sensitivity_%(jobid)s gps="%(gps)d" tag="%(tag)s" outdir="%(outdir)s" ifo_horizons="%(ifo_horizons)s"
@@ -62,6 +64,7 @@ output = $(outdir)/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).out
 notification = never
 queue 1'''
 
+compute_psd_jobid = "compute_psd_%s"
 compute_psd_dag = '''\
 JOB    compute_psd_%(jobid)s %(sub)s
 VARS   compute_psd_%(jobid)s gpsstart="%(gpsstart)d" gpsstop="%(gpsstop)d" outdir="%(outdir)s"
@@ -81,6 +84,7 @@ output = %(outdir)s/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).out
 notification = never
 queue 1'''
 
+plot_psd_jobid = "plot_psd_%s"
 plot_psd_dag = '''\
 JOB    plot_psd_%(jobid)s %(sub)s
 VARS   plot_psd_%(jobid)s psd="%(path)s"
@@ -100,6 +104,7 @@ output = %(outdir)s/condor-compute_exposure%(filetag)s_$(Cluster)-$(Process).out
 notification = never
 queue 1'''
 
+compute_exposure_jobid = " compute_exposure_%s"
 compute_exposure_dag = '''\
 JOB    compute_exposure_%(jobid)s %(sub)s
 VARS   compute_exposure_%(jobid)s FITS="%(FITS)s" normalize="%(normalize)s"
@@ -119,10 +124,31 @@ output = $(outdir)/condor-plot_maps%(filetag)s_$(Cluster)-$(Process).out
 notification = never
 queue 1'''
 
+plot_maps_jobid = "compute_horizon_%s"
 plot_maps_dag = '''\
 JOB    compute_horizon_%(jobid)s %(sub)s
 VARS   compute_horizon_%(jobid)s path="%(path)s" tag="%(tag)s"
 RETRY  compute_horizon_%(jobid)s %(retry)d
+'''
+
+monte_carlo_vt_sub = '''\
+universe = %(universe)s
+executable = %(exe)s
+arguments = "--verbose %(population)s $(gpsstart) $(gpsstop) --snr-threshold %(snr_threshold).6f --min-num-samples %(min_num_samples)d --fractional-systematic-error %(error).6f $(sources) --output-dir $(outdir) %(tag)s"
+getenv = true
+accounting_group = %(accounting_group)s
+accounting_group_user = %(accounting_group_user)s
+log    = $(outdir)/condor-monte-carlo-vt%(filetag)s_$(Cluster)-$(Process).log
+error  = $(outdir)/condor-monte-carlo-vt%(filetag)s_$(Cluster)-$(Process).err 
+output = $(outdir)/condor-monte-carlo-vt%(filetag)s_$(Cluster)-$(Process).out
+notification = never
+queue 1'''
+
+monte_carlo_vt_jobid = "monte_carlo_vt_%s"
+monte_carlo_vt_dag = '''\
+JOB    monte_carlo_vt_%(jobid)s %(sub)s
+VARS   monte_carlo_vt_%(jobid)s gpsstart="%(gpsstart)d" gpsstop="%(gpsstop)d" outdir="%(outdir)s" sources="%(sources)s"
+RETRY  monte_carlo_vt_%(jobid)s %(retry)d
 '''
 
 #-------------------------------------------------
@@ -214,7 +240,42 @@ def retrieve_segs(path):
     """
     return list(np.loadtxt(path))
 
+def report_horizon(path, horizon, flow, fhigh, psd_path):
+    """report the horizon to disk
+    """
+    with open(path, 'w') as f:
+        f.write('%.9e\n%d\n%d\n%s'%(horizon, flow, fhigh, psd_path))
+
+def retrieve_horizon(path):
+    """retrieve the horizon from disk
+    """
+    with open(path, 'r') as f:
+        horizon = float(f.readline().strip())
+        flow = float(f.readline().strip())
+        fhigh = float(f.readlin().strip())
+        psd_path = f.readline().strip()
+    return horizon, flow, fhigh, psd_path
+
+def report_sensitivity(path, sensitivity, *extra_header):
+    basepath = path.strip('.gz')
+    hp.write_map(
+        basepath,
+        network,
+        coord='C',
+        extra_header=extra_header,
+    )
+
+    if path.endswith('.gz'):
+        if opts.verbose:
+            print( "gzipping : %s -> %s"%(basepath, path) )
+        with open(basepath, 'r') as f:
+            with gzip.open(path, 'w') as gzf:
+                gzf.write(f.read())
+
 #-------------------------------------------------
+
+def livetime(segs):
+    return np.sum(e-s for s, e in segs)
 
 def andsegments(list1, list2):
     """

@@ -1,0 +1,126 @@
+#!/usr/bin/env python
+
+__doc__ = "massive parallelization of compute_network_sensitivity. We perform the matching association to figure out what IFOs are available when based on the path names"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import os
+import getpass
+from collections import defaultdict
+
+from distutils.spawn import find_executable
+
+from argparse import ArgumentParser
+
+### non-standard libraries
+from exposure import utils
+
+#-------------------------------------------------
+
+parser = ArgumentParser(description=__doc__)
+
+parser.add_argument('--ifo-paths', nargs='+', default=[], type=str, action='append', required=True,
+    help="--ifo-paths ifoA pathA1 [pathA2 pathA3 ...]")
+
+parser.add_argument("-v", "--verbose", default=False, action="store_true")
+
+parser.add_argument('-r', '--require', default=[], type=str, action='append',
+    help='require the PSD from this IFO to be present. Can be repeated to require multiple IFOs')
+parser.add_argument('--min-num-present', default=1, type=int,
+    help='the minimum number of PSDs that must be present to process a stride')
+
+parser.add_argument('--nside', default=512, type=int,
+    help='the NSIDE resolution for the resulting FITS files')
+
+parser.add_argument('--universe', default='vanilla', type=str,
+    help='DEFAULT=vanilla')
+parser.add_argument('--exe', default='compute-network-sensitivity', type=str,
+    help='specify the explicit path to the executable. \
+DEFAULT=compute_psd')
+
+parser.add_argument('--accounting-group', default='ligo.dev.o1.burst.explore.test', type=str,
+    help='DEFAULT=ligo.dev.o1.burst.explore.test')
+parser.add_argument('--accounting-group-user', default=getpass.getuser(), type=str,
+    help='DEFAULT='+getpass.getuser())
+
+parser.add_argument('--retry', default=0, type=int,
+    help='DEFAULT=0')
+
+parser.add_argument("-o", "--output-dir", default='.', type=str)
+parser.add_argument("-t", "--tag", default="", type=str)
+
+parser.add_argument('-s', '--condor-submit', default=False, action='store_true',
+    help='submit the DAG to condor')
+
+#-----------------------
+
+args = parser.parse_args()
+
+for thing in args.ifo_paths:
+    assert len(thing)%2==0, 'please supply an evan number of input arguments for --ifo-paths'
+
+if args.tag:
+    filetag = "_"+args.tag
+else:
+    filetag = ""
+
+args.output_dir = os.path.abspath(args.output_dir)
+if not os.path.exists(args.output_dir):
+    os.makedirs(args.output_dir)
+
+#--------------------------------------------------
+
+### set up associations with which IFOs are available when
+if args.verbose:
+    print( "sorting IFO horizon estiamtes by gps ranges" )
+gpstimes = defaultdict( dict )
+for ifo_paths in args.ifo_paths:
+    ifo = ifo_paths[0]
+    for path in ifo_paths[1:]:
+        gpstimes[utils.extract_start_dur(path, suffix='.txt.gz')].update( (ifo, path) )        
+
+#--------------------------------------------------
+
+### write sub file
+subname = "%s/compute_network_sensitivity%s.sub"%(args.output_dir, filetag)
+if args.verbose:
+    print( "writing : "+subname )
+with open(subname, 'w') as f:
+    f.write(utils.compute_network_sensitivity_sub%{\
+        'universe' : args.universe,
+        'exe' : os.path.abspath(find_executable(args.exe)),
+        'accounting_group' : args.accounting_group,
+        'accounting_group_user' : args.accounting_group_user,
+        'nside' : args.nside,
+        'filetag' : filetag,
+    })
+
+### iterate over segments and define compute-psd jobs for each
+dagname = subname.replace('.sub', '.dag')
+if args.verbose:
+    print( "writing : "+dagname )
+with open(dagname, 'w') as f:
+    for (start, dur), ifos in gpstimes.items():
+        if (len(ifos) >= args.min_num_present) and np.all(ifo in ifos for ifo in args.require):
+            f.write(utils.compute_network_sensitivity_dag%{\
+                'jobid' : '%d'%start,
+                'sub' : subname,
+                'gps' : start + 0.5*dur, ### take the center of the window, which should be good enough...
+                'tag' : args.tag+'-%d-%d'%(start, dur),
+                'ifo_horizons' : '--ifo-horizon '+' --ifo-horizon '.join('%s %s'%tuple(pair) for pair in ifos.items()),
+                'retry' : args.retry,
+                'outdir' : args.output_dir,
+            })
+
+#-------------------------------------------------
+
+### submit
+if args.condor_submit:
+    if args.verbose:
+        print( 'submitting : '+dagname )
+    import subprocess as sp
+    sp.Popen(['condor_submit_dag', dagname]).wait()
+
+elif args.verbose:
+    print( 'you can now submit : '+dagname )

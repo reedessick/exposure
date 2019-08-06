@@ -1,0 +1,82 @@
+#!/usr/bin/env python
+
+__doc__ = "compute the network sensitivity given ifo, range pairs"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import os
+
+import numpy as np
+import healpy as hp
+
+from argparse import ArgumentParser
+
+### non-standard libraries
+from exposure import utils
+from exposure import simulation
+
+from skymap_statitics import import detector_cache
+from skymap_statitics import triangulate
+
+#-------------------------------------------------
+
+parser = OptionParser(description=__doc__)
+
+parser.add_argument('gps', nargs='+', type=float)
+
+parser.add_argument('-v', '--verbose', default=False, action='store_true')
+parser.add_argument('-V', '--Verbose', default=False, action='store_true')
+
+parser.add_argument('--ifo-horizon', nargs=2, default=[], type=str, action='append',
+    help='specify which IFOs to include and paths to their range files as, e.g.: H1 path/to/horizon.txt.gz \
+DEFAULT=[]')
+
+parser.add_argument('--nside', default=simulation.DEFAULT_NSIDE, type=int, 
+    help='the NSIDE resolution for the resulting FITS files')
+
+parser.add_argument('-o', '--output-dir', default='.', type=str)
+parser.add_argument('-t', '--tag', default='', type=str)
+
+args = parser.parse_args()
+
+for ifo, _ in args.ifo_horizon:
+    assert detector_cache.detectors.has_key(ifo), 'IFO=%s not understood'%ifo
+
+if args.tag:
+    args.tag = "_"+args.tag
+
+args.output_dir = os.path.abspath(args.output_dir)
+if not os.path.exists(args.output_dir):
+    os.makedirs(args.output_dir)
+
+args.verbose |= args.Verbose
+
+#-------------------------------------------------
+
+### read in horizons
+horizons = []
+for ifo, path in args.ifo_horizon:
+    if args.verbose:
+        print( '%s -> %s'%(ifo, path) )
+    horizons.append( (detector_cache.detectors[ifo], utils.retrieve_horizon(path)[0]) )
+
+#------------------------
+
+### iterate over gps times
+npix = hp.nside2npix(args.nside)
+theta, ra = hp.pix2ang(args.nside, np.arange(npix)) ### positions in Equatorial coordinates
+psi = np.zeros_like(theta, dtype=float)
+
+for gps in args.gps:
+    if args.verbose:
+        print( 'gps=%.3f'%gps )
+    phi = triangulate.rotateRAC2E(ra, gps) ### find the corresponding positions in Geographic coordinates
+
+    network = simulation.detectors2antenna(horizons, theta, phi, psi)
+
+    path = utils.sensitivity_path(args.output_dir, args.tag, gps, gzip=True)
+    if args.verbose:
+        print( "writing : "+path )
+    extra_header=[(ifo, int(round(horizon, 0))) for ifo, horizon in horizons] + [('gps', int(round(gps, 0)))]
+    utils.report_sensitivity(path, network, *extra_header)

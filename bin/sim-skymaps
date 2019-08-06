@@ -52,6 +52,7 @@ assert len(args)==2, 'please supply exactly 2 input arguments\n%s'%__usage__
 gps_start, gps_stop = [float(_) for _ in args]
 assert opts.coord in KNOWN_COORD, '--coord must be one of: '+','.join(KNOWN_COORD)
 
+args.output_dir = os.path.abspath(args.output_dir)
 if not os.path.exists(opts.output_dir):
     os.makedirs(opts.output_dir)
 

@@ -1,0 +1,202 @@
+#!/usr/bin/env python
+
+__doc__ = "a very basic wrapper that schedules PSD and `monte-carlo-vt` jobs. The resulting DAG should run to completion if everything worked correctly (i.e. nodes should not raise exceptions"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import os
+import getpass
+import subprocess as sp
+
+from collections import defaultdict
+
+from distutils.spawn import find_executable
+
+from argparse import ArgumentParser
+
+### non-standard libraries
+from exposure import utils
+from exposure import datafind
+from exposure import montecarlo
+
+#-------------------------------------------------
+
+parser = ArgumentParser(description=__doc__)
+
+parser.add_argument('population', type=str,
+    help='the population specification config used to genreate Monte-Carlo samples. \
+This includes things like mass, spin, and redshift distributions, although we will \
+dynamically determine the maximum redshift for detectable sources given each set of PSDs.')
+
+parser.add_argument('gpsstart', type=float)
+parser.add_argument('gpsstop', type=float)
+
+parser.add_argument("-v", "--verbose", default=False, action="store_true")
+parser.add_argument("-V", "--Verbose", default=False, action="store_true")
+
+parser.add_argument("--include-flag", default=[], nargs=2, type=str, action='append',
+    help='the flags used to select subsets of [gpsstart, gpsstop] for analysis; eg. "--include-flag H H1:DMT-ANALYSIS_READY:1". \
+Can be repeated to take the intersection of multiple flags. \
+DEFAULT=[] (analyze all time in [gpsstart, gpsstop]).')
+parser.add_argument("--exclude-flag", default=[], nargs=2, type=str, action='append',
+    help='the same as --include-flag, except we only retain times that are \
+outside of these flags instead of inside them')
+
+parser.add_argument("--win", default=60, type=int,
+    help="estimate PSDs separately in sequential windows of this duration. \
+DEFAULT=60")
+
+parser.add_argument('-r', '--require', default=[], type=str, action='append',
+    help='require the PSD from this IFO to be present. Can be repeated to require multiple IFOs')
+parser.add_argument('--min-num-present', default=1, type=int,
+    help='the minimum number of PSDs that must be present to process a stride')
+
+parser.add_argument('-s', '--source', default=[], required=True, nargs=3, type=str, action='append',
+    help='a source of PSDs. This can be repeated to specify multiple IFOs. eg, "--source IFO rootdir tag')
+parser.add_argument('--snr-threshold', default=montecarlo.DEFAULT_SNR_THRESHOLD, type=float,
+    help='the network SNR threshold for detection. Used within gw_event_gen.eventgen.Pdet to determine the probability of detecting a signal')
+
+parser.add_argument('-N', '--min-num-samples', default=montecarlo.DEFAULT_MIN_NUM_SAMPLES, type=int,
+    help='the minimum number of Monte-Carlo samples to be generated for each stride, independent of the "smart" termination condition')
+parser.add_argument('-f', '--fractional-systematic-error', default=montecarlo.DEFAULT_ERROR, type=float,
+    help='the desired fractional systematic error expected from the Monte-Carlo integral for VT based on Farr (2019): arXiv:1904.10879. \
+If not specified, we will only be limitted by --min-num-samples. \
+**NOTE**, we assume zero observations (Nobs=0) in the derrived expressions, which will only scale the actual fractional systematic error \
+approximately linearly with the actually number of observaitons.')
+
+parser.add_argument('--universe', default='vanilla', type=str,
+    help='DEFAULT=vanilla')
+parser.add_argument('--exe', default='monte-carlo-vt', type=str,
+    help='specify the explicit path to the executable.')
+
+parser.add_argument('--accounting-group', default='ligo.dev.o1.burst.explore.test', type=str,
+    help='DEFAULT=ligo.dev.o1.burst.explore.test')
+parser.add_argument('--accounting-group-user', default=getpass.getuser(), type=str,
+    help='DEFAULT='+getpass.getuser())
+
+parser.add_argument('--retry', default=0, type=int,
+    help='DEFAULT=0')
+
+parser.add_argument("-o", "--output-dir", default='.', type=str)
+parser.add_argument("-t", "--tag", default="", type=str)
+
+parser.add_argument('--condor-submit', default=False, action='store_true',
+    help='submit the DAG to condor')
+
+args = parser.parse_args()
+
+stride = args.gpsstop - args.gpsstart
+
+if args.tag:
+    filetag = "_"+args.tag
+else:
+    filetag = ""
+
+args.output_dir = os.path.abspath(args.output_dir)
+if not os.path.exists(args.output_dir):
+    os.makedirs(args.output_dir)
+
+args.verbose |= args.Verbose
+
+include_flag = defaultdict(list)
+for ifo, flag in args.include_flag:
+    include_flag[ifo].append(flag)
+exclude_flag = defaultdict(list)
+for ifo, flag in args.exclude_flag:
+    exclude_flag[ifo].append(flag)
+
+#-------------------------------------------------
+
+### query segments to define individual runs
+### ensure we have proper coverage
+segments = dict()
+for ifo, _, _ in args.source:
+    if args.verbose:
+        print('quering flags for: '+ifo)
+    segs = [[args.gpsstart, args.gpsstop]]
+    segs = datafind.include_flags(segs, include_flag[ifo], args.gpsstart, stride, verbose=args.verbose)
+    segs = datafind.exclude_flags(segs, exclude_flag[ifo], args.gpsstart, stride, verbose=args.verbose)
+    segments[ifo] = segs
+
+### check to make sure we have livetime left, etc
+assert sum(len(val) for val in segments.values()), 'no remaining livetime after filtering by flags!'
+
+#------------------------
+
+### write sub file
+mc_subname = "%s/monte-carlo-vt%s.sub"%(args.output_dir, filetag)
+if args.verbose:
+    print( "writing : "+mc_subname)
+with open(mc_subname, 'w') as f:
+    f.write(utils.monte_carlo_vt_sub%{\
+        'universe' : args.universe,
+        'exe' : os.path.abspath(find_executable(args.exe)),
+        'population' : args.population,
+        'snr_threshold' : args.snr_threshold,
+        'min_num_samples' : args.min_num_samples,
+        'error' : args.fractional_systematic_error,
+        'accounting_group' : args.accounting_group,
+        'accounting_group_user' : args.accounting_group_user,
+        'tag' :  "--tag "+args.tag if args.tag else '',
+        'filetag' : filetag,
+    })
+
+### iterate over segments and define compute_psd jobs for each
+dagname = mc_subname.replace('.sub', '.dag')
+if args.verbose:
+    print( "writing : "+dagname )
+with open(dagname, 'w') as f:
+
+    covered = 0 ### amount of time that's covered by a PSD estimate
+
+    segstart = (int(args.gpsstart)/args.win)*args.win ### line-up start with integer number of windows. Needed to guarantee files will line up later -> integer division!
+    if segstart < args.gpsstart: ### mostly likely case, but we need to check just in case
+        segstart += args.win
+
+    segstop = segstart + args.win
+
+    while segstop < args.gpsstop: ### analyze every possible stride...
+        if args.Verbose:
+            print( "scheduling jobs for %d -- %d"%(segstart, segstop) )
+
+        ### figure out which IFOs are active during this stride
+        present = []
+        sources = ""
+        seg = [[segstart, segstop]]
+        for ifo, rootdir, tag in args.source: ### do this once for each IFO
+            if utils.livetime(utils.andsegments(seg, segments[ifo]))==utils.livetime(seg):
+                present.append(ifo)
+                sources += " --sources %s %s '%s'"%(ifo, rootdir, tag)
+
+        if (len(present) >= args.min_num_present) and all(ifo in present for ifo in args.require):
+            f.write(utils.monte_carlo_vt_dag%{\
+                'jobid' : '%d'%segstart,
+                'sub' : mc_subname,
+                'gpsstart' : segstart,
+                'gpsstop' : segstop,
+                'sources' : sources,
+                'retry' : args.retry,
+                'outdir' : args.output_dir,
+            })
+
+            covered += args.win
+
+        segstart = segstop
+        segstop += args.win
+
+#-------------------------------------------------
+
+if args.verbose: ### report amount of time covered
+    print( 'requested       : %d sec'%stride )
+    print( 'covered by PSD  : %d sec'%covered )
+
+### submit
+if args.condor_submit:
+    if args.verbose:
+        print( 'submitting : '+dagname )
+    import subprocess as sp
+    sp.Popen(['condor_submit_dag', dagname]).wait()
+
+elif args.verbose:
+    print( 'you can now submit : '+dagname )

@@ -42,6 +42,7 @@ parser.add_option('', '--figtype', default=[], type='string', action='append')
 opts, args = parser.parse_args()
 assert len(args), 'please supply at least one input argument\n%s'%__usage__
 
+args.output_dir = os.path.abspath(args.output_dir)
 if not os.path.exists(opts.output_dir):
     os.makedirs(opts.output_dir)
 

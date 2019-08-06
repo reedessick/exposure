@@ -1,0 +1,120 @@
+#!/usr/bin/env python
+
+__doc__ = "an executable that monte-carlo samples the VT integral based on PSD estimates between [gpsstart, gpsstop]"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import os
+
+from argparse import ArgumentParser
+
+### non-standar libraries
+from exposure import datafind
+from exposure import utils
+from exposure import montecarlo
+
+from skymap_statistics import detector_cache
+
+from gw_event_gen import eventgen
+
+#-------------------------------------------------
+
+parser = ArgumentParser(description=__doc__)
+
+parser.add_argument('population', type=str,
+    help='the population specification config used to genreate Monte-Carlo samples. \
+This includes things like mass, spin, and redshift distributions, although we will \
+dynamically determine the maximum redshift for detectable sources given each set of PSDs.')
+
+parser.add_argument('gpsstart', type=float)
+parser.add_argument('gpsstop', type=float)
+
+parser.add_argument('-v', '--verbose', default=False, action='store_true')
+
+parser.add_argument('-s', '--source', default=[], required=True, nargs=3, type=str, action='append',
+    help='a source of PSDs. This can be repeated to specify multiple IFOs. eg, "--source IFO rootdir tag')
+parser.add_argument('--snr-threshold', default=montecarlo.DEFAULT_SNR_THRESHOLD, type=float,
+    help='the network SNR threshold for detection. Used within gw_event_gen.eventgen.Pdet to determine the probability of detecting a signal')
+
+parser.add_argument('-N', '--min-num-samples', default=montecarlo.DEFAULT_MIN_NUM_SAMPLES, type=int,
+    help='the minimum number of Monte-Carlo samples to be generated for each stride, independent of the "smart" termination condition')
+parser.add_argument('-f', '--fractional-systematic-error', default=montecarlo.DEFAULT_ERROR, type=float,
+    help='the desired fractional systematic error expected from the Monte-Carlo integral for VT based on Farr (2019): arXiv:1904.10879. \
+If not specified, we will only be limitted by --min-num-samples. \
+**NOTE**, we assume zero observations (Nobs=0) in the derrived expressions, which will only scale the actual fractional systematic error \
+approximately linearly with the actually number of observaitons.')
+
+parser.add_argument("-o", "--output-dir", default='.', type=str)
+parser.add_argument("-t", "--tag", default="", type=str)
+
+args = parser.parse_args()
+
+stride = args.gpsstop - args.gpsstart
+
+if args.tag:
+    args.tag = "_"+args.tag
+
+args.source = [(ifo, rootdir, "_"+tag) for ifo, rootdir, tag in args.source]
+
+args.output_dir = os.path.abspath(args.output_dir)
+if not os.path.exists(args.output_dir):
+    os.makedirs(args.output_dir)
+
+#------------------------
+
+for ifo, _, _ in args.source:
+    assert ifo in detector_cache.detectors, 'ifo=%s not a known detector! known detectors are %s'%(ifo, ', '.join(detector_cache.detectors.keys()))
+
+#-------------------------------------------------
+
+if args.verbose:
+    print('reading in population specifications from: '+args.population)
+generator, timedistribution = montecarlo.path2generator(args.population)
+
+### add AttributeTransformation for Pdet
+network = detector_cache.Network() # declare this shared reference here
+celest2geo = False
+for trans in generator._transforms:
+    if isinstance(trans, eventgen.Pdet):
+        raise RuntimeError('please do not specify Pdet within %s; this will be instantiated separately'%args.population)
+    celest2geo += isinstance(trans, eventgen.Celestial2Geographic)
+if not celest2geo:
+    generator.append_transform(eventgen.Celestial2Geographic())
+generator.append_transform(eventgen.Pdet(network, snr_thr=args.snr_threshold)) ### this must come after the rest of the transforms
+
+#-------------------------------------------------
+
+### go find PSDs, requiring all to be present
+for ifo, rootdir, tag in args.source:
+    psdpath = utils.psd_path(rootdir, tag, args.gpsstart, stride)
+    if args.verbose:
+        print('searching for PSD for %s with rootdir=%s, tag=%s within [%d, %d).'%(ifo, rootdir, tag, args.gpsstart, args.gpsstop))
+    if os.path.exists(psdpath):
+        if args.verbose:
+            print('updating PSD for %s from %s for data within [%d, %d).'%(ifo, psdpath, args.gpsstart, args.gpsstop))
+        freqs, psd = utils.retrieve_psd(psdpath) ### read from disk
+        det = detector_cache.detectors[ifo]
+        det.psd.update(psd, freqs=freqs) ### update object in place 
+        network.add(det) ### append object to list of dectors for which we found data
+    else:
+        raise RuntimeError('could not find PSD for %s named %s'%(ifo, psdpath))
+
+generator.update_max_redshift(network)
+
+if args.verbose:
+    print('Monte-Carlo sampling VT integral to fractional precision of %.3e with at least %d samples for data within [%d, %d).'%\
+        (args.fractional_systematic_error, args.min_num_samples, args.gpsstart, args.gpsstop))
+for event in generator.generate_events(min_num_samples=args.min_num_samples, error=args.fractional_systematic_error):
+    pass
+
+### write samples
+samplespath = utils.samples_path(args.output_dir, args.tag, args.gpsstart, args.gpsstop-args.gpsstart)
+thatdir = os.path.dirname(samplespath)
+if not os.path.exists(thatdir):
+    os.makedirs(thatdir)
+if args.verbose:
+    print( 'writing samples to %s for data within [%d, %d).'%(samplespath, args.gpsstart, args.gpsstop))
+
+attrs = sorted(generator.attributes)+sorted(eventgen.Event._waveattrs)
+eventgen.events2csv(generator._events, attrs, samplespath) ### use the I/O defined within eventgen to make this consistent with that library
