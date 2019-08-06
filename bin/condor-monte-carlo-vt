@@ -153,8 +153,9 @@ with open(dagname, 'w') as f:
         ### figure out which IFOs are active during this stride
         present = []
         sources = ""
+        seg = [[segstart, segstop]]
         for ifo, rootdir, tag in args.source: ### do this once for each IFO
-            if utils.livetime(utils.andsegments(seg, segments[ifo])):
+            if utils.livetime(utils.andsegments(seg, segments[ifo]))==utils.livetime(seg):
                 present.append(utils.compute_psd_jobid%('%s-%d'%(ifo, segstart)))
                 sources =+ " --sources %s %s %s"%(ifo, rootdir, tag)
 

@@ -201,8 +201,9 @@ with open(dagname, 'w') as f:
 
         ### figure out which IFOs are active during this stride
         present = []
+        seg = [[segstart, segstop]]
         for ifo, _, _ in args.source: ### do this once for each IFO
-            if utils.livetime(utils.andsegments(seg, segments[ifo])):
+            if utils.livetime(utils.andsegments(seg, segments[ifo]))==utils.livetime(seg):
                 present.append(utils.compute_psd_jobid%('%s-%d'%(ifo, segstart)))
 
         if (len(present) >= args.min_num_present) and np.all(ifo in present for ifo in args.require):
