@@ -10,7 +10,7 @@ import numpy as np
 
 #-------------------------------------------------
 
-DEFAULT_ACCOUNTING_GROUP = 'ligo.dev.o1.burst.explore.test' 
+DEFAULT_ACCOUNTING_GROUP = 'ligo.sim.o3.cbc.bayesianpopulations.parametric' 
 DEFAULT_RETRY = 0
 
 #-------------------------------------------------
