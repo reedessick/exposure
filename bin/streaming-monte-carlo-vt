@@ -125,12 +125,15 @@ generator, timedistribution = montecarlo.path2generator(args.population)
 network = detector_cache.Network() # declare this shared reference here
 celest2geo = False
 for trans in generator._transforms:
+    if isinstance(trans, eventgen.SNR):
+        raise RuntimeError('please do not specify SNR within %s; this will be instantiated separately'%args.population)
     if isinstance(trans, eventgen.Pdet):
         raise RuntimeError('please do not specify Pdet within %s; this will be instantiated separately'%args.population)
     celest2geo += isinstance(trans, eventgen.Celestial2Geographic)
 if not celest2geo:
     generator.append_transform(eventgen.Celestial2Geographic())
-generator.append_transform(eventgen.Pdet(network, snr_thr=args.snr_threshold)) ### this must come after the rest of the transforms
+generator.append_transform(eventgen.SNR(network)) ### this must come after the rest of the transforms
+generator.append_transform(eventgen.Pdet(snr_thr=args.snr_threshold)) ### this must come after SNR
 
 #-------------------------------------------------
 
