@@ -163,7 +163,7 @@ time_periods = defaultdict( dict )
 #-------------------------------------------------
 
 ### set up DAG
-dagname = "%s/compute_psd_horizon_sensitivity%s.dag"%(args.output_dir, filetag)
+dagname = "%s/compute_psd_horizon_sensitivity%s-%d-%d.dag"%(args.output_dir, filetag, gpsstart, stride)
 if args.verbose:
     print( "writing : "+dagname )
 dag = open(dagname, 'w')
@@ -193,7 +193,7 @@ for ifo, channel, frametype in args.source:
     subtag = '--tag '+args.tag+ifo
 
     ### write PSD sub file
-    psd_subname = "%s/compute_psd%s-%s.sub"%(args.output_dir, filetag, ifo)
+    psd_subname = "%s/compute_psd%s-%s-%d-%d.sub"%(args.output_dir, filetag, ifo, gpsstart, stride)
     if args.verbose:
         print( "writing : "+psd_subname )
     with open(psd_subname, 'w') as sub:
@@ -214,7 +214,7 @@ for ifo, channel, frametype in args.source:
         })
 
     ### write horizon sub file
-    hor_subname = "%s/compute_horizon%s-%s.sub"%(args.output_dir, filetag, ifo)
+    hor_subname = "%s/compute_horizon%s-%s-%d-%d.sub"%(args.output_dir, filetag, ifo, gpsstart, stride)
     if args.verbose:
         print( "writing : "+hor_subname )
     with open(hor_subname, 'w') as sub:
@@ -303,7 +303,7 @@ if args.verbose: ### report amount of time covered
     print( 'covered by PSD  : %d sec'%covered )
 
 ### add network sensitivity jobs
-sen_subname = "%s/compute_network_sensitivity%s.sub"%(args.output_dir, filetag)
+sen_subname = "%s/compute_network_sensitivity%s-%d-%d.sub"%(args.output_dir, filetag, gpsstart, stride)
 if args.verbose:
     print( "writing : "+sen_subname )
 sen_sub = open(sen_subname, 'w')
@@ -395,7 +395,7 @@ if args.compute_exposure:
 
     ### add in final exposure job
     exp_cachename = "%s/compute_exposure%s.cache"%(args.output_dir, filetag)
-    exp_subname = "%s/compute_exposure%s.sub"%(args.output_dir, filetag)
+    exp_subname = "%s/compute_exposure%s-%s-%d.sub"%(args.output_dir, filetag, gpsstart, stride)
     if args.verbose:
         print( "writing : "+exp_subname )
     exp_sub = open(exp_subname, 'w')

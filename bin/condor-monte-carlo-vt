@@ -123,7 +123,7 @@ assert sum(len(val) for val in segments.values()), 'no remaining livetime after 
 #------------------------
 
 ### write sub file
-mc_subname = "%s/monte-carlo-vt%s.sub"%(args.output_dir, filetag)
+mc_subname = "%s/monte-carlo-vt%s-%d-%d.sub"%(args.output_dir, filetag, args.gpsstart, stride)
 if args.verbose:
     print( "writing : "+mc_subname)
 with open(mc_subname, 'w') as f:

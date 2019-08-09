@@ -146,7 +146,7 @@ assert sum(len(val) for val in segments.values()), 'no remaining livetime after 
 ### write sub files
 psd_subnames = dict()
 for ifo, channel, frametype in args.source:
-    psd_subname = "%s/compute-psd-%s%s.sub"%(args.output_dir, ifo, filetag)
+    psd_subname = "%s/compute-psd-%s%s-%d-%d.sub"%(args.output_dir, ifo, filetag, args.gpsstart, stride)
     if args.verbose:
         print( "writing : "+psd_subname )
     psd_subnames[ifo] = psd_subname
@@ -165,7 +165,7 @@ for ifo, channel, frametype in args.source:
             'tukey_alpha' : args.tukey_alpha,
         })
 
-mc_subname = "%s/monte-carlo-vt%s.sub"%(args.output_dir, filetag)
+mc_subname = "%s/monte-carlo-vt%s-%d-%d.sub"%(args.output_dir, filetag, args.gpsstart, stride)
 if args.verbose:
     print( "writing : "+mc_subname)
 with open(mc_subname, 'w') as f:
@@ -183,7 +183,7 @@ with open(mc_subname, 'w') as f:
     })
 
 ### iterate over segments and define compute_psd jobs for each
-dagname = "%s/compute-psd-monte-carlo-vt%s.dag"%(args.output_dir, filetag)
+dagname = "%s/compute-psd-monte-carlo-vt%s-%d-%d.dag"%(args.output_dir, filetag, args.gpsstart, stride)
 if args.verbose:
     print( "writing : "+dagname )
 with open(dagname, 'w') as f:

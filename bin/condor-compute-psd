@@ -107,7 +107,7 @@ lvtm = utils.livetime(segments) ### amount of time requested within segments
 #------------------------
 
 ### write sub file
-subname = "%s/compute-psd%s.sub"%(args.output_dir, filetag)
+subname = "%s/compute-psd%s-%d-%d.sub"%(args.output_dir, filetag, args.gpsstart, stride)
 if args.verbose:
     print( "writing : "+subname )
 with open(subname, 'w') as f:
