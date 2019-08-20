@@ -23,9 +23,9 @@ arguments = "$(path) --output-dir $(outdir) $(tag) --flow %(flow)d --fhigh %(fhi
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
-log    = $(outdir)/condor-compute_horizon%(filetag)s_$(Cluster)-$(Process).log
-error  = $(outdir)/condor-compute_horizon%(filetag)s_$(Cluster)-$(Process).err 
-output = $(outdir)/condor-compute_horizon%(filetag)s_$(Cluster)-$(Process).out
+log    = $(outdir)/log/condor-compute_horizon%(filetag)s_$(Cluster)-$(Process).log
+error  = $(outdir)/log/condor-compute_horizon%(filetag)s_$(Cluster)-$(Process).err 
+output = $(outdir)/log/condor-compute_horizon%(filetag)s_$(Cluster)-$(Process).out
 notification = never
 queue 1'''
 
@@ -43,9 +43,9 @@ arguments = "$(gps) $(ifo_horizons) --nside %(nside)d --output-dir $(outdir) --t
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
-log    = $(outdir)/condor-compute_network_sensitivity%(filetag)s_$(Cluster)-$(Process).log
-error  = $(outdir)/condor-compute_network_sensitivity%(filetag)s_$(Cluster)-$(Process).err 
-output = $(outdir)/condor-compute_network_sensitivity%(filetag)s_$(Cluster)-$(Process).out
+log    = $(outdir)/log/condor-compute_network_sensitivity%(filetag)s_$(Cluster)-$(Process).log
+error  = $(outdir)/log/condor-compute_network_sensitivity%(filetag)s_$(Cluster)-$(Process).err 
+output = $(outdir)/log/condor-compute_network_sensitivity%(filetag)s_$(Cluster)-$(Process).out
 notification = never
 queue 1'''
 
@@ -63,9 +63,9 @@ arguments = "%(channel)s %(frametype)s $(gpsstart) $(gpsstop) --seglen %(seglen)
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
-log    = $(outdir)/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).log
-error  = $(outdir)/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).err 
-output = $(outdir)/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).out
+log    = $(outdir)/log/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).log
+error  = $(outdir)/log/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).err 
+output = $(outdir)/log/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).out
 notification = never
 queue 1'''
 
@@ -83,9 +83,9 @@ arguments = "$(psd) --f-min %(fmin)d --f-max %(fmax)d --y-min %(ymin)e --y-max %
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
-log    = %(outdir)s/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).log
-error  = %(outdir)s/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).err 
-output = %(outdir)s/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).out
+log    = %(outdir)s/log/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).log
+error  = %(outdir)s/log/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).err 
+output = %(outdir)s/log/condor-compute_psd%(filetag)s_$(Cluster)-$(Process).out
 notification = never
 queue 1'''
 
@@ -103,9 +103,9 @@ arguments = "$(FITS) $(normalize) --nside %(nside)d --index %(index)d --output-d
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
-log    = %(outdir)s/condor-compute_exposure%(filetag)s_$(Cluster)-$(Process).log
-error  = %(outdir)s/condor-compute_exposure%(filetag)s_$(Cluster)-$(Process).err 
-output = %(outdir)s/condor-compute_exposure%(filetag)s_$(Cluster)-$(Process).out
+log    = %(outdir)s/log/condor-compute_exposure%(filetag)s_$(Cluster)-$(Process).log
+error  = %(outdir)s/log/condor-compute_exposure%(filetag)s_$(Cluster)-$(Process).err 
+output = %(outdir)s/log/condor-compute_exposure%(filetag)s_$(Cluster)-$(Process).out
 notification = never
 queue 1'''
 
@@ -123,9 +123,9 @@ arguments = "$(base),$(path) --coord %(coord)s --grid --projection %(projection)
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
-log    = $(outdir)/condor-plot_maps%(filetag)s_$(Cluster)-$(Process).log
-error  = $(outdir)/condor-plot_maps%(filetag)s_$(Cluster)-$(Process).err 
-output = $(outdir)/condor-plot_maps%(filetag)s_$(Cluster)-$(Process).out
+log    = $(outdir)/log/condor-plot_maps%(filetag)s_$(Cluster)-$(Process).log
+error  = $(outdir)/log/condor-plot_maps%(filetag)s_$(Cluster)-$(Process).err 
+output = $(outdir)/log/condor-plot_maps%(filetag)s_$(Cluster)-$(Process).out
 notification = never
 queue 1'''
 
@@ -143,9 +143,9 @@ arguments = "--verbose %(population)s $(gpsstart) $(gpsstop) --snr-threshold %(s
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
-log    = $(outdir)/condor-monte-carlo-vt%(filetag)s_$(Cluster)-$(Process).log
-error  = $(outdir)/condor-monte-carlo-vt%(filetag)s_$(Cluster)-$(Process).err 
-output = $(outdir)/condor-monte-carlo-vt%(filetag)s_$(Cluster)-$(Process).out
+log    = $(outdir)/log/condor-monte-carlo-vt%(filetag)s_$(Cluster)-$(Process).log
+error  = $(outdir)/log/condor-monte-carlo-vt%(filetag)s_$(Cluster)-$(Process).err 
+output = $(outdir)/log/condor-monte-carlo-vt%(filetag)s_$(Cluster)-$(Process).out
 notification = never
 queue 1'''
 

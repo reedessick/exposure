@@ -256,6 +256,10 @@ while segstart+args.win < gpsstop:
             if not os.path.exists(outdir):
                 os.makedirs(outdir)
 
+            logdir = os.path.join(args.outdir, 'log')
+            if not os.path.exists(logdir):
+                os.makedirs(logdir)
+
             ### add the PSD generation
             dag.write(utils.compute_psd_dag%{\
                 'jobid' : '%s-%d'%(ifo, segstart),
@@ -322,6 +326,10 @@ if args.compute_exposure: ### needed for book-keeping for how we structure the c
 
 for s, ifos in time_periods.items():
     outdir = utils.gps2dir(args.output_dir, s, args.win) ### should already exist!
+    logdir = os.path.join(outdir, 'log')
+    if not os.path.exists(logdir):
+        os.makedirs(logdir)
+
     gps = s + 0.5*args.win ### take the center of the window, which should be good enough...
     dag.write(utils.compute_network_sensitivity_dag%{\
         'jobid' : '%d'%s,
@@ -350,6 +358,11 @@ if args.compute_exposure:
     for smod, paths in long_periods.items():
         ### write sub file
         outdir = os.path.join(args.output_dir, '%d'%smod)
+
+        logdir = os.path.join(outdir, 'log')
+        if not os.path.exists(logdir):
+            os.makedirs(logdir)
+
         exp_cachename = "%s/compute_exposure-%d.cache"%(outdir, smod)
         exp_subname = "%s/compute_exposure%s-%d.sub"%(args.output_dir, filetag, smod)
         if args.verbose:
