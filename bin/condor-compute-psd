@@ -19,7 +19,7 @@ from exposure import datafind
 
 #-------------------------------------------------
 
-parser = OptionParser(description=__doc__)
+parser = ArgumentParser(description=__doc__)
 
 parser.add_argument('channel', type=str)
 parser.add_argument('frametype', type=str)
@@ -121,7 +121,7 @@ with open(subname, 'w') as f:
         'channel' : args.channel,
         'frametype' : args.frametype,
         'accounting_group' : args.accounting_group,
-        'accounting_group_user' : args..accounting_group_user,
+        'accounting_group_user' : args.accounting_group_user,
         'tag' :  "--tag "+args.tag if args.tag else '',
         'filetag' : filetag,
         'start' : args.gpsstart,
