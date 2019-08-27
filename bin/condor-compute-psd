@@ -143,11 +143,11 @@ with open(dagname, 'w') as f:
         if args.verbose:
             print( "scheduling jobs for %d -- %d"%(segstart, segstop) )
     
-        s = (segstart/opts.win)*opts.win ### line-up start with integer number of windows. Needed to guarantee files will line up later -> integer division!
+        s = (segstart/args.win)*args.win ### line-up start with integer number of windows. Needed to guarantee files will line up later -> integer division!
         if s < segstart: ### mostly likely case, but we need to check just in case
-            s += opts.win 
+            s += args.win 
 
-        while s+opts.win < segstop:
+        while s+args.win < segstop:
             f.write(utils.compute_psd_dag%{\
                 'jobid' : '%d'%s,
                 'sub' : subname,
