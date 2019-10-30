@@ -1,0 +1,90 @@
+#!/usr/bin/env python
+
+__description__ = "plot PSDs stored in gzipped ascii files like those produced by compute_psd"
+__author__ = "Reed Essick (reed.essick@ligo.org)"
+
+#-------------------------------------------------
+
+import os
+
+import numpy as np
+
+import matplotlib
+matplotlib.use("Agg")
+from matplotlib import pyplot as plt
+plt.rcParams['text.usetex'] = True
+
+from argparse import ArgumentParser
+
+### non-standard libraries
+from exposure import utils
+
+#-------------------------------------------------
+
+parser = ArgumentParser(description=__description__)
+
+parser.add_argument('psd', nargs='+', type=str)
+
+parser.add_argument('-v', '--verbose', default=False, action='store_true')
+
+parser.add_argument('--f-min', default=8, type=float, 
+    help='DEFAULT=8')
+parser.add_argument('--f-max', default=2048, type=float,
+    help='DEFAULT=2048')
+
+parser.add_argument('--y-min', default=1e-24, type=float,
+    help='DEFAULT=1e-24')
+parser.add_argument('--y-max', default=1e-20, type=float,
+    help='DEFAULT=1e-20')
+
+parser.add_argument('--legend', default=False, action='store_true')
+parser.add_argument('--alpha', default=1.0, type=float)
+
+parser.add_argument('-o', '--output-dir', default='.', type=str)
+parser.add_argument('-t', '--tag', default='', type=str)
+
+parser.add_argument('--figtype', default=[], type=str, action='append')
+
+args = parser.parse_args()
+
+if args.tag:
+    args.tag = "_"+args.tag
+
+args.output_dir = os.path.abspath(args.output_dir)
+if not os.path.exists(args.output_dir):
+    os.makedirs(args.output_dir)
+
+if not args.figtype:
+    args.figtype.append( 'png' )
+
+#-------------------------------------------------
+
+fig = plt.figure()
+ax = fig.gca()
+
+### iterate and plot
+for path in args.psd:
+    if args.verbose:
+        print('processing: '+path)
+    freq, psd = utils.retrieve_psd(path)    
+    ax.loglog(freq, psd**0.5, label=os.path.basename(path).strip('.txt.gz'), alpha=args.alpha)
+
+### decorate
+ax.set_xlabel('$f$ [Hz]')
+ax.set_ylabel('ASD [1/$\sqrt{\mathrm{Hz}}$]')
+
+ax.grid(True, which='both')
+
+if args.legend:
+    ax.legend(loc='best')
+
+ax.set_xlim(xmin=args.f_min, xmax=args.f_max)
+ax.set_ylim(ymin=args.y_min, ymax=args.y_max)
+
+### save
+for figtype in args.figtype:
+    figname = "%s/psd%s.%s"%(args.output_dir, args.tag, figtype)
+    if args.verbose:
+        print( figname )
+    fig.savefig(figname)
+plt.close(fig)
