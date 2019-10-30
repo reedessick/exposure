@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+
+"""a script to pull out quantiles from the PSD CDF data structures and write them into the same format used for the rest of our PSD data
+"""
+__author__ = "Reed Essick (reed.essick@gmail.com)"
+
+#-------------------------------------------------
+
+import os
+import numpy as np
+
+from argparse import ArgumentParser
+
+### non-standard libraries
+from exposure import utils
+
+#-------------------------------------------------
+
+parser = ArgumentParser(description=__doc__)
+
+parser.add_argument('psd_cdf', type=str)
+parser.add_argument('quantile', nargs='+', type=float)
+
+parser.add_argument('-v', '--verbose', default=False, action='store_true')
+
+parser.add_argument('-o', '--output-dir', default='.', type=str)
+parser.add_argument('-t', '--tag', default='', type=str)
+
+args = parser.parse_args()
+
+if not os.path.exists(args.output_dir):
+    try:
+        os.makedirs(args.output_dir)
+    except OSError:
+        pass ### race condition making directories
+
+if args.tag:
+    args.tag = "_"+args.tag
+
+#-------------------------------------------------
+
+if args.verbose:
+    print('loading: '+args.psd_cdf)
+freqs, vals, cdf, _ = utils.retrieve_psd_cdf(args.psd_cdf)
+Nfrq = len(freqs)
+
+tmp = '_%.3f'+args.tag
+for q in args.quantile:
+    if args.verbose:
+        print('extracting quantile %.3f'%q)
+    psd = np.array([np.interp(q, cdf[ind,:], vals[ind,:]) for ind in range(Nfrq)], dtype=float)
+
+    path = os.path.join(args.output_dir, utils.psd_basename(tmp%q, None, 0))
+    if args.verbose:
+        print("writing : "+path)
+    utils.report_psd(path, freqs, psd)

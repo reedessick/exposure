@@ -6,6 +6,7 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 import os
 import gzip
 
+import h5py
 import numpy as np
 
 #-------------------------------------------------
@@ -164,7 +165,13 @@ def segs_path(output_dir, tag, gpsstart, gpsdur):
     return "%s/seg%s-%d-%d.txt.gz"%(gps2moddir(output_dir, gpsstart), tag, (int(gpsstart)/MOD_STRIDE)*MOD_STRIDE, MOD_STRIDE)
 
 def psd_path(output_dir, tag, gpsstart, gpsdur):
-    return "%s/psd%s-%d-%d.csv.gz"%(gps2dir(output_dir, gpsstart, gpsdur), tag, gpsstart, gpsdur)
+    return "%s/%s"%(gps2dir(output_dir, gpsstart, gpsdur), psd_basename(tag, gpsstart, gpsdur))
+
+def psd_basename(tag, gpsstart, gpsdur):
+    return "psd%s-%s-%s.csv.gz"%(tag, gpsstart, gpsdur)
+
+def psd_cdf_path(output_dir, tag):
+    return "%s/psdcdf%s.hdf5"%(output_dir, tag)
 
 def samples_path(output_dir, tag, gpsstart, gpsdur):
     return "%s/samples%s-%d-%d.csv.gz"%(gps2dir(output_dir, gpsstart, gpsdur), tag, gpsstart, gpsdur)
@@ -276,6 +283,37 @@ def report_sensitivity(path, sensitivity, *extra_header):
         with open(basepath, 'r') as f:
             with gzip.open(path, 'w') as gzf:
                 gzf.write(f.read())
+
+def report_psd_cdf(path, freqs, vals, cdfs, Npsd):
+    """interact with hdf5 file format for marginal CDFs for a set of PSDs.
+Expect vals and cdfs to have the shape (Nfrq, Npts)
+    """
+    with h5py.File(path, 'w') as obj:
+        group = obj.create_group('PSD_CDF')
+        group.attrs.create('num_psds', Npsd)
+        group.create_dataset('frequencies', data=freqs, dtype=float)
+
+        Nfrq, Npts = np.shape(vals)
+        assert len(freqs)==Nfrq
+
+        data = np.empty((Nfrq, 2, Npts), dtype=float)
+        data[:,0,:] = vals
+        data[:,1,:] = cdfs
+
+        group.create_dataset('CDFs', data=data, dtype=float)
+
+def retrieve_psd_cdf(path):
+    """interact with hdf5 file format for marginal CDFs for a set of PSDs"""
+    with h5py.File(path, 'r') as obj:
+        group = obj['PSD_CDF']
+        Npsd = group.attrs['num_psds']
+        freqs = group['frequencies'][...]
+        data = group['CDFs'][...]
+
+    vals = data[:,0,:]
+    cdfs = data[:,1,:]
+
+    return freqs, vals, cdfs, Npsd
 
 #-------------------------------------------------
 

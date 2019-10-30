@@ -1,0 +1,89 @@
+#!/usr/bin/env python
+
+"""combine CDFs for PSDs into a single CDF, with each contribution weighed by the number of PSDs that were originally included
+"""
+__author__ = "Reed Essick (reed.essick@gmail.com)"
+
+#-------------------------------------------------
+
+import os
+import numpy as np
+
+from argparse import ArgumentParser
+
+### non-standard libraries
+from exposure import utils
+
+#-------------------------------------------------
+
+def combine_cdf(val1, cdf1, N1, val2, cdf2, N2):
+    """returns vals, cdf
+    """
+    counts1 = cdf1*N1
+    counts2 = cdf2*N2
+
+    vals = sorted(set(list(val1) + list(val2)))
+    counts = [np.interp(val, val1, counts1) + np.interp(val, val2, counts2) for val in vals]
+
+    return np.array(vals), np.array(counts, dtype=float)/(N1+N2) 
+
+#-------------------------------------------------
+
+parser = ArgumentParser(description=__doc__)
+
+parser.add_argument('psd_cdf', nargs='+', type=str)
+
+parser.add_argument('-n', '--num-points', default=101, type=int,
+    help='the number of points to use when representing the combined CDF')
+
+parser.add_argument('-v', '--verbose', default=False, action='store_true')
+
+parser.add_argument('-o', '--output-dir', default='.', type=str)
+parser.add_argument('-t', '--tag', default='', type=str)
+
+args = parser.parse_args()
+
+if not os.path.exists(args.output_dir):
+    try:
+        os.makedirs(args.output_dir)
+    except OSError:
+        pass ### race condition making output directory
+
+if args.tag:
+    args.tag = "_"+args.tag
+
+#-------------------------------------------------
+
+path = args.psd_cdf[0]
+if args.verbose:
+    print('loading: '+path)
+freqs, v, c, Npsd = utils.retrieve_psd_cdf(path)
+
+Nfrq = len(freqs)
+vals = np.empty((Nfrq, args.num_points), dtype=float)
+cdfs = np.empty((Nfrq, args.num_points), dtype=float)
+quantiles = np.linspace(0, 1, args.num_points)
+
+### set up initial results, which just amounts to interpolation
+for ind in range(Nfrq):
+    cdfs[ind,:] = quantiles
+    vals[ind,:] = np.interp(quantiles, c[ind,:], v[ind,:])
+
+### repeat for the remaining results
+for path in args.psd_cdf[1:]:
+    if args.verbose:
+        print('loading: '+path)
+    f, v, c, N = utils.retrieve_psd_cdf(path)
+    assert np.all(f==freqs), 'frequency mismatch between %s and %s'%(args.psd_cdf[0], path)
+
+    for ind in range(Nfrq): ### add to cdfs
+        a, b = combine_cdf(vals[ind,:], cdfs[ind,:], Npsd, v[ind,:], c[ind,:], N)
+        vals[ind,:] = np.interp(quantiles, b, a)
+
+    Npsd += N ### increment
+
+### report the results
+path = utils.psd_cdf_path(args.output_dir, args.tag)
+if args.verbose:
+    print('writing: '+path)
+utils.report_psd_cdf(path, freqs, vals, cdfs, Npsd)
