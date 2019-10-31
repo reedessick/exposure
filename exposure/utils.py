@@ -157,6 +157,47 @@ VARS   monte_carlo_vt_%(jobid)s gpsstart="%(gpsstart)d" gpsstop="%(gpsstop)d" ou
 RETRY  monte_carlo_vt_%(jobid)s %(retry)d
 '''
 
+compute_psd_cdf_tag = '$(day)%(filetag)s'
+compute_psd_cdf_sub = '''\
+universe = %(universe)s
+executable = %(exe)s
+arguments = "$(psds) --output-dir %(outdir)s --tag $(day)%(filetag)s --num-points %(num_points)d --verbose"
+getenv = true
+accounting_group = %(accounting_group)s
+accounting_group_user = %(accounting_group_user)s
+log    = %(outdir)s/log/condor-compute-psd-cdf%(filetag)s_$(Cluster)-$(Process).log
+error  = %(outdir)s/log/condor-compute-psd-cdf%(filetag)s_$(Cluster)-$(Process).err 
+output = %(outdir)s/log/condor-compute-psd-cdf%(filetag)s_$(Cluster)-$(Process).out
+notification = never
+queue 1'''
+
+compute_psd_cdf_jobid = 'compute_psd_cdf_%s'
+compute_psd_cdf_dag = '''\
+JOB %(job)s %(sub)s
+VARS %(job)s psds="%(psds)s" day="%(day)s"
+RETRY %(job)s %(retry)d
+'''
+
+combine_psd_cdf_sub = '''\
+universe = %(universe)s
+executable = %(exe)s
+arguments = "$(psdcdfs) --output-dir %(outdir)s --tag %(tag)s --num-points %(num_points)d --verbose"
+getenv = true
+accounting_group = %(accounting_group)s
+accounting_group_user = %(accounting_group_user)s
+log    = %(outdir)s/log/condor-combine-psd-cdf%(filetag)s_$(Cluster)-$(Process).log
+error  = %(outdir)s/log/condor-combine-psd-cdf%(filetag)s_$(Cluster)-$(Process).err 
+output = %(outdir)s/log/condor-combine-psd-cdf%(filetag)s_$(Cluster)-$(Process).out
+notification = never
+queue 1'''
+
+combine_psd_cdf_jobid = 'combine_psd_cdf_%s'
+combine_psd_cdf_dag = '''
+JOB %(job)s %(sub)s
+VARS %(job)s psdcdfs="%(psdcdfs)s"
+RETRY %(job)s %(retry)d
+'''
+
 #-------------------------------------------------
 
 MOD_STRIDE = 100000

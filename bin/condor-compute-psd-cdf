@@ -1,0 +1,161 @@
+#!/usr/bin/env python
+
+"""a quick script to slap together a DAG to combine PSDs via condor
+"""
+__author__ = "Reed Essick (reed.essick@gmail.com)"
+
+#-------------------------------------------------
+
+import glob
+import os
+import getpass
+from distutils.spawn import find_executable
+
+import subprocess as sp
+
+from argparse import ArgumentParser
+
+### non-standard libraries
+from exposure import utils
+
+#-------------------------------------------------
+
+parser = ArgumentParser(description=__doc__)
+
+parser.add_argument('ifo', type=str)
+parser.add_argument('directory', nargs='+', type=str)
+
+parser.add_argument('-v', '--verbose', default=False, action='store_true')
+parser.add_argument('-n', '--num-points', default=100, type=int)
+
+parser.add_argument('--universe', default='vanilla', type=str,
+    help='DEFAULT=vanilla')
+parser.add_argument('--compute-exe', default='compute-psd-cdf', type=str,
+    help='specify the explicit path to the executable.')
+parser.add_argument('--combine-exe', default='combine-psd-cdf', type=str,
+    help='specify the explicit path to the executable.')
+
+parser.add_argument('--accounting-group', default=utils.DEFAULT_ACCOUNTING_GROUP, type=str)
+parser.add_argument('--accounting-group-user', default=getpass.getuser(), type=str,
+    help='DEFAULT='+getpass.getuser())
+
+parser.add_argument('--retry', default=utils.DEFAULT_RETRY, type=int)
+
+parser.add_argument("-o", "--output-dir", default='.', type=str)
+parser.add_argument("-t", "--tag", default="", type=str)
+
+parser.add_argument('--condor-submit', default=False, action='store_true',
+    help='submit the DAG to condor')
+
+args = parser.parse_args()
+
+args.output_dir = os.path.abspath(args.output_dir)
+logdir = os.path.join(args.output_dir, 'log')
+if not os.path.exists(logdir):
+    try:
+        os.makedirs(logdir)
+    except OSError:
+        pass ### race condition
+
+if args.tag:
+    args.tag = "_"+args.tag
+tag = '%s%s'%(args.ifo, args.tag)
+filetag = '_'+tag
+
+#-------------------------------------------------
+
+### write SUB files
+# sub for compute-psd-cdf
+compute_sub = '%s/condor-compute-psd-cdf%s.sub'%(args.output_dir, filetag)
+if args.verbose:
+    print('writing: '+compute_sub)
+with open(compute_sub, 'w') as obj:
+    obj.write(utils.compute_psd_cdf_sub%{\
+        'universe': args.universe,
+        'exe': find_executable(args.compute_exe),
+        'accounting_group': args.accounting_group,
+        'accounting_group_user': args.accounting_group_user,
+        'outdir': args.output_dir,
+        'filetag': filetag,
+        'num_points': args.num_points,
+    })
+
+# sub for combine-psd-cdf
+combine_sub = '%s/condor-combine-psd-cdf%s.sub'%(args.output_dir, filetag)
+if args.verbose:
+    print('writing: '+combine_sub)
+with open(combine_sub, 'w') as obj:
+    obj.write(utils.combine_psd_cdf_sub%{\
+        'universe': args.universe,
+        'exe': find_executable(args.combine_exe),
+        'accounting_group': args.accounting_group,
+        'accounting_group_user': args.accounting_group_user,
+        'outdir': args.output_dir,
+        'tag': tag,
+        'filetag': filetag,
+        'num_points': args.num_points,
+    })
+
+#-------------------------------------------------
+
+### write DAG file
+dag = combine_sub.replace('.sub', '.dag')
+if args.verbose:
+    print('writing: '+dag)
+with open(dag, 'w') as obj:
+    ### write all the compute jobs
+    psdcdfs = []
+    jobs = []
+    for directory in args.directory:
+        if args.verbose:
+            print('processing: '+directory)
+
+        ### find all relevant PSDs in this day
+        psds = glob.glob(os.path.join(directory, '*', 'psd_%s_*csv.gz'%(args.ifo)))
+        if not psds: ### nothing found!
+            if args.verbose:
+                print('    no PSDs found! skipping this directory')
+            continue
+
+        ### we have some PSDs, so include this day in the DAG
+        day = os.path.basename(directory.strip('/'))
+        job = utils.compute_psd_cdf_jobid%(args.ifo+'-'+day)
+        obj.write(utils.comptue_psd_cdf_dag%{\
+            'job': job,
+            'sub': compute_sub,
+            'psds': ' '.join(psds),
+            'day': day,
+            'retry': args.retry,
+        })
+        jobs.append(job)
+        psdcdfs.append( utils.psd_cdf_path(args.output_dir, '_'+utils.compute_psd_cdf_tag%{'day':day, 'filetag':filetag}) )
+
+    if jobs: ### something to do
+        
+        ### write combine job
+        if args.verbose:
+            print('procesing combine-psd-cdf job')
+        combine_job = utils.combine_psd_cdf_jobid%'all'
+        obj.write(utils.combine_psd_cdf_dag%{\
+            'job': combine_job,
+            'sub': combine_sub,
+            'psdcdfs': ' '.join(psdcdfs),
+            'retry': args.retry,
+        })
+
+        ### write parent-child relationships
+        if args.verbose:
+            print('processing parent-child relationships')
+        for job in jobs:
+            obj.write('PARENT %s CHILD %s\n'%(job, combine_job))
+
+### launch?
+cmd = ['condor_submit_dag', dag]
+if args.condor_submit:
+    if args.verbose:
+        print(' '.join(cmd))
+    sp.Popen(cmd)
+
+else:
+    if args.verbose:
+        print('you can now submit your dag via\n\t%s'%(' '.join(cmd)))
