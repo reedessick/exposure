@@ -45,6 +45,8 @@ If not specified, we will only be limitted by --min-num-samples. \
 **NOTE**, we assume zero observations (Nobs=0) in the derrived expressions, which will only scale the actual fractional systematic error \
 approximately linearly with the actually number of observaitons.')
 
+parser.add_argument("--psd-suffix", default='csv.gz', type=str)
+parser.add_argument("--samples-suffix", default='csv.gz', type=str)
 parser.add_argument("-o", "--output-dir", default='.', type=str)
 parser.add_argument("-t", "--tag", default="", type=str)
 
@@ -90,7 +92,7 @@ generator.append_transform(eventgen.Pdet(snr_thr=args.snr_threshold)) ### this m
 
 ### go find PSDs, requiring all to be present
 for ifo, rootdir, tag in args.source:
-    psdpath = utils.psd_path(rootdir, tag, args.gpsstart, stride)
+    psdpath = utils.psd_path(rootdir, tag, args.gpsstart, stride, suffix=args.psd_suffix)
     if args.verbose:
         print('searching for PSD for %s with rootdir=%s, tag=%s within [%d, %d).'%(ifo, rootdir, tag, args.gpsstart, args.gpsstop))
     if os.path.exists(psdpath):
@@ -112,7 +114,7 @@ for event in generator.generate_events(min_num_samples=args.min_num_samples, err
     pass
 
 ### write samples
-samplespath = utils.samples_path(args.output_dir, args.tag, args.gpsstart, args.gpsstop-args.gpsstart)
+samplespath = utils.samples_path(args.output_dir, args.tag, args.gpsstart, args.gpsstop-args.gpsstart, suffix=args.samples_suffix)
 thatdir = os.path.dirname(samplespath)
 if not os.path.exists(thatdir):
     os.makedirs(thatdir)
@@ -120,4 +122,9 @@ if args.verbose:
     print( 'writing samples to %s for data within [%d, %d).'%(samplespath, args.gpsstart, args.gpsstop))
 
 attrs = sorted(generator.attributes)+sorted(eventgen.Event._waveattrs)
-eventgen.events2csv(generator._events, attrs, samplespath) ### use the I/O defined within eventgen to make this consistent with that library
+if samplespath.endswith('csv') or samplespath.endswith('csv.gz'):
+    eventgen.events2csv(generator._events, attrs, samplespath) ### use the I/O defined within eventgen to make this consistent with that library
+elif samplespath.endswith('hdf5') or samplespath.endswith('h5'):
+    eventgen.events2hdf5(generator._events, attrs, samplespath, name='samples')
+else:
+    raise ValueError('samples-suffix=%s not recognized!'%args.samples_suffix)

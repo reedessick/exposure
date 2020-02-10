@@ -4,6 +4,7 @@ __author__ = "Reed Essick (reed.essick@ligo.org)"
 #-------------------------------------------------
 
 import os
+import shutil
 import gzip
 
 import h5py
@@ -60,7 +61,7 @@ RETRY  compute_network_sensitivity_%(jobid)s %(retry)d
 compute_psd_sub = '''\
 universe = %(universe)s
 executable = %(exe)s
-arguments = "%(channel)s %(frametype)s $(gpsstart) $(gpsstop) --seglen %(seglen)d --overlap %(overlap)d --tukey-alpha %(tukey_alpha)f --output-dir $(outdir) %(tag)s -V"
+arguments = "%(channel)s %(frametype)s $(gpsstart) $(gpsstop) --seglen %(seglen)d --overlap %(overlap)d --tukey-alpha %(tukey_alpha)f --suffix %(suffix)s --output-dir $(outdir) %(tag)s -V"
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
@@ -140,7 +141,7 @@ RETRY  compute_horizon_%(jobid)s %(retry)d
 monte_carlo_vt_sub = '''\
 universe = %(universe)s
 executable = %(exe)s
-arguments = "--verbose %(population)s $(gpsstart) $(gpsstop) --snr-threshold %(snr_threshold).6f --min-num-samples %(min_num_samples)d --fractional-systematic-error %(error).6f $(sources) --output-dir $(outdir) %(tag)s"
+arguments = "--verbose %(population)s $(gpsstart) $(gpsstop) --snr-threshold %(snr_threshold).6f --min-num-samples %(min_num_samples)d --fractional-systematic-error %(error).6f --psd-suffix %(psd_suffix)s --samples-suffix %(samples_suffix)s $(sources) --output-dir $(outdir) %(tag)s"
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
@@ -205,17 +206,17 @@ MOD_STRIDE = 100000
 def segs_path(output_dir, tag, gpsstart, gpsdur):
     return "%s/seg%s-%d-%d.txt.gz"%(gps2moddir(output_dir, gpsstart), tag, (int(gpsstart)/MOD_STRIDE)*MOD_STRIDE, MOD_STRIDE)
 
-def psd_path(output_dir, tag, gpsstart, gpsdur):
-    return "%s/%s"%(gps2dir(output_dir, gpsstart, gpsdur), psd_basename(tag, gpsstart, gpsdur))
+def psd_path(output_dir, tag, gpsstart, gpsdur, suffix='csv.gz'):
+    return "%s/%s"%(gps2dir(output_dir, gpsstart, gpsdur), psd_basename(tag, gpsstart, gpsdur, suffix=suffix))
 
-def psd_basename(tag, gpsstart, gpsdur):
-    return "psd%s-%s-%s.csv.gz"%(tag, gpsstart, gpsdur)
+def psd_basename(tag, gpsstart, gpsdur, suffix='csv.gz'):
+    return "psd%s-%s-%s.%s"%(tag, gpsstart, gpsdur, suffix)
 
 def psd_cdf_path(output_dir, tag):
     return "%s/psdcdf%s.hdf5"%(output_dir, tag)
 
-def samples_path(output_dir, tag, gpsstart, gpsdur):
-    return "%s/samples%s-%d-%d.csv.gz"%(gps2dir(output_dir, gpsstart, gpsdur), tag, gpsstart, gpsdur)
+def samples_path(output_dir, tag, gpsstart, gpsdur, suffix='csv.gz'):
+    return "%s/samples%s-%d-%d.%s"%(gps2dir(output_dir, gpsstart, gpsdur), tag, gpsstart, gpsdur, suffix)
 
 def horizon_path(output_dir, tag, gpstart, gpsdur):
     return "%s/horizon%s-%d-%d.txt.gz"%(output_dir, tag, gpstart, gpsdur)
@@ -237,21 +238,88 @@ def gps2dir(directory, start, dur):
 def extract_start_dur(path, suffix='.gwf'):
     return [int(_) for _ in path[:-len(suffix)].split('-')[-2:]]
 
-def report_psd(path, freqs, psd):
+#------------------------
+### logic for reading/writing PSDs
+
+def report_psd(path, freqs, psd, tmpdir='/tmp'):
     """writes the PSD to disk
     """
     ### save to a temporary file
-    tmp = os.path.join(os.path.dirname(path), '.'+os.path.basename(path))
-    np.savetxt(tmp, np.array(zip(freqs, psd)), comments='', delimiter=',', header='frequency,psd')
+    tmp = os.path.join(tmpdir, '.'+os.path.basename(path))
+    if path.endswith('csv') or path.endswith('csv.gz'):
+        _write_psd_csv(tmp, freqs, psd)
+    elif path.endswith('hdf5') or path.endswith('h5'):
+        _write_psd_hdf5(tmp, freqs, psd)
+    else:
+        raise ValueError('suffix not recognized for PSD path %s'%path)
+
     ### move to the final location
-    os.system('mv %s %s'%(tmp, path))
+    shutil.move(tmp, path)
+
+def _write_psd_csv(path, freqs, psd):
+    np.savetxt(path, np.array(zip(freqs, psd)), comments='', delimiter=',', header='frequency,psd')
+
+def _write_psd_hdf5(path, freqs, psd, name='samples'):
+    with h5py.File(path, 'w') as obj:
+        obj.create_dataset(name, data=np.array(zip(freqs, psd), dtype=[('frequency',float), ('psd',float)]))
 
 def retrieve_psd(path):
     """read the PSD from disk
     return freqs, psd
     """
+    if path.endswith('csv') or path.endswith('csv.gz'):
+        return _read_psd_csv(path)
+    elif path.endswith('hdf5') or path.endswith('h5'):
+        return _read_psd_hdf5(tmp, freqs, psd)
+    else:
+        raise ValueError('suffix not recognized for PSD path %s'%path)
+
+def _read_psd_csv(path):
     ans = np.genfromtxt(path, delimiter=',', names=True)
     return ans['frequency'], ans['psd']
+
+def _read_psd_hdf5(path, name='samples'):
+    with h5py.File(path, 'r') as obj:
+        freq = obj[name]['frequency']
+        psd = obj[name]['psd']
+    return freq, psd
+
+#------------------------
+### logic for reading/writing PSD CDFs
+
+def report_psd_cdf(path, freqs, vals, cdfs, Npsd):
+    """interact with hdf5 file format for marginal CDFs for a set of PSDs.
+Expect vals and cdfs to have the shape (Nfrq, Npts)
+    """
+    with h5py.File(path, 'w') as obj:
+        group = obj.create_group('PSD_CDF')
+        group.attrs.create('num_psds', Npsd)
+        group.create_dataset('frequencies', data=freqs, dtype=float)
+
+        Nfrq, Npts = np.shape(vals)
+        assert len(freqs)==Nfrq
+
+        data = np.empty((Nfrq, 2, Npts), dtype=float)
+        data[:,0,:] = vals
+        data[:,1,:] = cdfs
+
+        group.create_dataset('CDFs', data=data, dtype=float)
+
+def retrieve_psd_cdf(path):
+    """interact with hdf5 file format for marginal CDFs for a set of PSDs"""
+    with h5py.File(path, 'r') as obj:
+        group = obj['PSD_CDF']
+        Npsd = group.attrs['num_psds']
+        freqs = group['frequencies'][...]
+        data = group['CDFs'][...]
+
+    vals = data[:,0,:]
+    cdfs = data[:,1,:]
+
+    return freqs, vals, cdfs, Npsd
+
+#------------------------
+### logic for reading/wirting segments
 
 def report_segs(path, new_segs):
     """reads in the segments contained in path and appends the current seg of segs to them
@@ -286,12 +354,15 @@ def report_segs(path, new_segs):
         tmp = os.path.join(os.path.dirname(path), '.'+os.path.basename(path))
         np.savetxt(tmp, segs, fmt='%d')
         ### move to final location
-        os.system('mv %s %s'%(tmp, path))
+        shutil.move(tmp, path)
 
 def retrieve_segs(path):
     """retrieves segments from disk
     """
     return list(np.loadtxt(path))
+
+#------------------------
+### logic for reading/writing horizon estimates
 
 def report_horizon(path, horizon, flow, fhigh, psd_path):
     """report the horizon to disk
@@ -309,6 +380,9 @@ def retrieve_horizon(path):
         psd_path = f.readline().strip()
     return horizon, flow, fhigh, psd_path
 
+#------------------------
+### logic for reading/writing sensitivities
+
 def report_sensitivity(path, sensitivity, *extra_header):
     basepath = path.strip('.gz')
     hp.write_map(
@@ -324,37 +398,6 @@ def report_sensitivity(path, sensitivity, *extra_header):
         with open(basepath, 'r') as f:
             with gzip.open(path, 'w') as gzf:
                 gzf.write(f.read())
-
-def report_psd_cdf(path, freqs, vals, cdfs, Npsd):
-    """interact with hdf5 file format for marginal CDFs for a set of PSDs.
-Expect vals and cdfs to have the shape (Nfrq, Npts)
-    """
-    with h5py.File(path, 'w') as obj:
-        group = obj.create_group('PSD_CDF')
-        group.attrs.create('num_psds', Npsd)
-        group.create_dataset('frequencies', data=freqs, dtype=float)
-
-        Nfrq, Npts = np.shape(vals)
-        assert len(freqs)==Nfrq
-
-        data = np.empty((Nfrq, 2, Npts), dtype=float)
-        data[:,0,:] = vals
-        data[:,1,:] = cdfs
-
-        group.create_dataset('CDFs', data=data, dtype=float)
-
-def retrieve_psd_cdf(path):
-    """interact with hdf5 file format for marginal CDFs for a set of PSDs"""
-    with h5py.File(path, 'r') as obj:
-        group = obj['PSD_CDF']
-        Npsd = group.attrs['num_psds']
-        freqs = group['frequencies'][...]
-        data = group['CDFs'][...]
-
-    vals = data[:,0,:]
-    cdfs = data[:,1,:]
-
-    return freqs, vals, cdfs, Npsd
 
 #-------------------------------------------------
 

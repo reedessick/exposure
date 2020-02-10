@@ -76,6 +76,8 @@ parser.add_argument('--accounting-group-user', default=getpass.getuser(), type=s
 
 parser.add_argument('--retry', default=utils.DEFAULT_RETRY, type=int)
 
+parser.add_argument('--psd-suffix', default='csv.gz', type=str)
+parser.add_argument('--samples-suffix', default='csv.gz', type=str)
 parser.add_argument("-o", "--output-dir", default='.', type=str)
 parser.add_argument("-t", "--tag", default="", type=str)
 
@@ -138,6 +140,8 @@ with open(mc_subname, 'w') as f:
         'snr_threshold' : args.snr_threshold,
         'min_num_samples' : args.min_num_samples,
         'error' : args.fractional_systematic_error,
+        'psd_suffix' : args.psd_suffix,
+        'samples_suffix' : args.samples_suffix,
         'accounting_group' : args.accounting_group,
         'accounting_group_user' : args.accounting_group_user,
         'tag' :  "--tag "+args.tag if args.tag else '',

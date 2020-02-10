@@ -118,6 +118,7 @@ parser.add_argument('--condor-submit', default=False, action='store_true',
     help='submit the DAG to condor')
 
 ### options for output formatting
+parser.add_argument('--psd-suffix', default='csv.gz', type=str)
 parser.add_argument("-o", "--output-dir", default='.', type=str)
 parser.add_argument("-t", "--tag", default="", type=str)
 
@@ -211,6 +212,7 @@ for ifo, channel, frametype in args.source:
             'seglen' : args.seglen,
             'overlap' : args.overlap,
             'tukey_alpha' : args.tukey_alpha,
+            'suffix' : args.psd_suffix,
         })
 
     ### write horizon sub file

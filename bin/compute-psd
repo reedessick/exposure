@@ -46,6 +46,7 @@ parser.add_argument("--tukey-alpha", default=dft.DEFAULT_TUKEY_ALPHA, type=float
     help='the Tukey "alpha" value used for windowing the DFT. \
 DEFAULT=%.3f'%dft.DEFAULT_TUKEY_ALPHA)
 
+parser.add_argument('--suffix', default='csv.gz', type=str)
 parser.add_argument("-o", "--output-dir", default='.', type=str)
 parser.add_argument("-t", "--tag", default="", type=str)
 
@@ -109,7 +110,7 @@ if args.verbose:
 psd, freqs = dft.estimate_psd(vect, num_segs=n, overlap=overlap, dt=dt, tukey_alpha=args.tukey_alpha)
 
 ### write PSD
-path = utils.psd_path(args.output_dir, args.tag, args.gpsstart, stride)
+path = utils.psd_path(args.output_dir, args.tag, args.gpsstart, stride, suffix=args.suffix)
 directory = os.path.dirname(path)
 if not os.path.exists(directory):
     os.makedirs(directory)
