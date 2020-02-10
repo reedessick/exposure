@@ -64,6 +64,8 @@ parser.add_argument('-v', '--verbose', default=False, action='store_true')
 parser.add_argument('--gpsstart', type=float, default=None)
 parser.add_argument('--gpsstop', type=float, default=None)
 
+parser.add_argument('--psd-suffix', default='csv.gz', type=str)
+parser.add_arugment('--samples-suffix', default='csv.gz', type=str)
 parser.add_argument('--output-dir', default='.', type=str)
 parser.add_argument('--tag', default='', type=str)
 
@@ -176,7 +178,7 @@ while current < args.gpsstop:
 
     datafind.wait(future, delay=args.delay, logger=logger)
     for ifo, rootdir, tag, required in args.source:
-        psdpath = utils.psd_path(rootdir, tag, current, args.stride)
+        psdpath = utils.psd_path(rootdir, tag, current, args.stride, suffix=args.psd_suffix)
         logger.info(psdtmps[ifo]%tup)
         if os.path.exists(psdpath):
             logger.info(updatetmp%((ifo, psdpath,)+tup))
@@ -226,13 +228,20 @@ while current < args.gpsstop:
             pass
 
         ### write samples
-        samplespath = utils.samples_path(args.output_dir, args.tag, current, args.stride)
+        samplespath = utils.samples_path(args.output_dir, args.tag, current, args.stride, suffix=args.samples_suffix)
         thatdir = os.path.dirname(samplespath)
         if not os.path.exists(thatdir):
             os.makedirs(thatdir)
         logger.info(sampleswritetmp%((samplespath,)+tup))
 
         attrs = sorted(generator.attributes)+sorted(eventgen.Event._waveattrs)
+        if samplespath.endswith('csv') or samplespath.endswith('csv.gz'):
+            eventgen.events2csv(generator._events, attrs, samplespath) ### use the I/O defined within eventgen to make this consistent with that library
+        elif samplespath.endswith('hdf5') or samplespath.endswith('h5'):
+            eventgen.events2hdf5(generator._events, attrs, samplespath, name='samples')
+        else:
+            raise ValueError('samples-suffix=%s not recognized!'%args.samples_suffix)
+
         eventgen.events2csv(generator._events, attrs, samplespath) ### use the I/O defined within eventgen to make this consistent with that library
 
         ### get rid of samples

@@ -60,6 +60,7 @@ eg, "--segs-channel-bitmask H1:GDS-CALIB_STATE 8". can be repeated.')
 
 parser.add_argument('-v', '--verbose', default=False, action='store_true')
 
+parser.add_argument('--suffix', default='csv.gz', type=str)
 parser.add_argument('-o', '--output-dir', default='.', type=str)
 parser.add_argument('-t', '--tag', default='', type=str)
 
@@ -194,7 +195,7 @@ while current < args.gpsstop:
     psd, freqs = dft.estimate_psd(vec, num_segs=n, overlap=overlap, dt=dt, tukey_alpha=args.tukey_alpha)
    
     # write PSD
-    psdpath = utils.psd_path(args.output_dir, args.tag, current, args.stride)
+    psdpath = utils.psd_path(args.output_dir, args.tag, current, args.stride, suffix=args.suffix)
     thatdir = os.path.dirname(psdpath)
     if not os.path.exists(thatdir):
         os.makedirs(thatdir)
