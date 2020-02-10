@@ -27,8 +27,8 @@ parser.add_argument('population', type=str,
 This includes things like mass, spin, and redshift distributions, although we will \
 dynamically determine the maximum redshift for detectable sources given each set of PSDs.')
 
-parser.add_argument('gpsstart', type=float)
-parser.add_argument('gpsstop', type=float)
+parser.add_argument('gpsstart', type=int)
+parser.add_argument('gpsstop', type=int)
 
 parser.add_argument('-v', '--verbose', default=False, action='store_true')
 
