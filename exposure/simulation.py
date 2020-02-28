@@ -7,7 +7,7 @@ import numpy as np
 import healpy as hp
 
 ### non-standard libraries
-from skymap_statitics import triangulate
+from skymap_statistics import triangulate
 
 #-------------------------------------------------
 

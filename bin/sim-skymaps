@@ -17,7 +17,7 @@ from optparse import OptionParser
 
 ### non-standard libraries
 from exposure import simulation
-from skymap_statitics import detector_cache
+from skymap_statistics import detector_cache
 
 #-------------------------------------------------
 
